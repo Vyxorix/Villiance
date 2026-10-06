@@ -1,0 +1,36 @@
+{
+  "url": "http://127.0.0.1:8080/",
+  "viewports": {
+    "desktop": {
+      "width": 1280,
+      "height": 800,
+      "status": 200,
+      "title": "Brilliance",
+      "hasCanvas": false,
+      "bodyTextLen": 540,
+      "bodyTextHash": "53885f211cde215e18701798eab0faa2ff12970391b7d69763160ea71df98a20",
+      "bodyTextPrefix": "Brilliance Play, analyze, hunt the sacrifice. Play Analyze Studi",
+      "horizontalOverflow": false,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "screenshot": "/workspace/screenshots/app-builder-preview.png"
+    },
+    "mobile": {
+      "width": 390,
+      "height": 844,
+      "status": 200,
+      "title": "Brilliance",
+      "hasCanvas": false,
+      "bodyTextLen": 276,
+      "bodyTextHash": "176d22615b417c025312b7291c60943bda9284667aaa1a1af60009f1cfa8128d",
+      "bodyTextPrefix": "Brilliance Play, analyze, hunt the sacrifice. Play Analyze Studi",
+      "horizontalOverflow": false,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "screenshot": "/workspace/screenshots/app-builder-preview-mobile.png"
+    }
+  },
+  "brandWarnings": [],
+  "authWarnings": [],
+  "verdictFile": "/workspace/screenshots/app-builder-preview.json"
+}
