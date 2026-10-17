@@ -21,13 +21,15 @@
   --color-board-select: #c5d3a8;
   --color-check: #c45c4a;
   --color-brilliant: #3d9b7a;
+  --color-arrow: #e4edd6;
+  --color-arrow-edge: #243026;
   --color-great: #5d8a9e;
   --color-good: #7a8f78;
   --color-inacc: #8a7e5a;
   --color-mistake: #c47a4a;
   --color-blunder: #c45c4a;
-  --color-eval-w: #eceae4;
-  --color-eval-b: #2a2c27;
+  --color-eval-w: #f3f0e6;
+  --color-eval-b: #121410;
 
   --radius-xs: 4px;
   --radius-sm: 8px;

@@ -82,24 +82,27 @@ export function whiteScore(score: Score, turn: Color): Score {
 export function formatScore(score: Score | null): string {
   if (!score) return "…";
   if (score.type === "mate") {
-    if (score.value === 0) return "#";
-    return score.value > 0 ? `#${score.value}` : `#-${Math.abs(score.value)}`;
+    if (score.value === 0) return "0.00";
+    const n = Math.abs(score.value);
+    return score.value > 0 ? `+M${n}` : `-M${n}`;
   }
   const pawns = score.value / 100;
-  const abs = Math.abs(pawns).toFixed(Math.abs(pawns) >= 10 ? 0 : 1);
+  const digits = Math.abs(pawns) >= 10 ? 1 : 2;
+  const abs = Math.abs(pawns).toFixed(digits);
   if (pawns > 0.04) return `+${abs}`;
   if (pawns < -0.04) return `-${abs}`;
-  return "0.0";
+  return "0.00";
 }
 
 export function evalToWhitePct(score: Score | null): number {
   if (!score) return 0.5;
   if (score.type === "mate") {
     if (score.value === 0) return 0.5;
-    return score.value > 0 ? 0.97 : 0.03;
+    return score.value > 0 ? 1 : 0;
   }
-  const p = 1 / (1 + Math.exp(-score.value / 280));
-  return Math.min(0.97, Math.max(0.03, p));
+  // Lichess expected-score curve. +100cp ≈ 59%, +300cp ≈ 75%.
+  const p = 1 / (1 + Math.exp(-0.00368208 * score.value));
+  return Math.min(1, Math.max(0, p));
 }
 
 export function pvToSan(fen: string, pv: string[]): string[] {

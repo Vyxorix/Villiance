@@ -90,7 +90,7 @@ export class StockfishEngine {
     });
     await this.waitFor("uci", (l) => l === "uciok", 12000);
     this.post("setoption name Hash value 32");
-    this.post("setoption name MultiPV value 4");
+    this.post("setoption name MultiPV value 3");
     await this.waitFor("isready", (l) => l === "readyok", 8000);
     this.ready = true;
   }

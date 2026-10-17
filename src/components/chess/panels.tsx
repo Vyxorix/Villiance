@@ -42,6 +42,14 @@ const CLASS_LABEL: Record<Classification, string> = {
   blunder: "Blunder",
 };
 
+const MARK: Partial<Record<Classification, string>> = {
+  brilliant: "!!",
+  great: "!",
+  inaccuracy: "?!",
+  mistake: "?",
+  blunder: "??",
+};
+
 export function GameToolbar() {
   const cursor = useGame((s) => s.cursor);
   const len = useGame((s) => s.plies.length);
@@ -188,24 +196,24 @@ function MoveBtn({
       type="button"
       onClick={onClick}
       className={cn(
-        "flex h-8 items-center justify-between rounded-[var(--radius-xs)] px-2 text-left font-medium",
+        "flex h-11 items-center justify-between rounded-[var(--radius-xs)] px-2 text-left font-medium",
         active ? "bg-surface-2 text-fg" : "text-fg/90 hover:bg-surface-2/60",
       )}
     >
       <span>{san}</span>
-      {cls && cls !== "good" && cls !== "book" && (
+      {cls && MARK[cls] && (
         <span
           className={cn(
-            "ml-1 size-1.5 rounded-full",
-            cls === "brilliant" && "bg-brilliant",
-            cls === "great" && "bg-great",
-            cls === "best" && "bg-accent",
-            cls === "excellent" && "bg-good",
-            cls === "inaccuracy" && "bg-inacc",
-            cls === "mistake" && "bg-mistake",
-            cls === "blunder" && "bg-blunder",
+            "font-mono text-xs",
+            cls === "brilliant" && "text-brilliant",
+            cls === "great" && "text-great",
+            cls === "inaccuracy" && "text-inacc",
+            cls === "mistake" && "text-mistake",
+            cls === "blunder" && "text-blunder",
           )}
-        />
+        >
+          {MARK[cls]}
+        </span>
       )}
     </button>
   );
@@ -242,10 +250,17 @@ export function EnginePanel() {
       </div>
 
       {brilliant && (
-        <div className="rounded-[var(--radius-lg)] border border-brilliant/30 bg-brilliant/10 p-4">
+        <div
+          className={cn(
+            "rounded-[var(--radius-lg)] border p-4",
+            brilliant.sacrifice
+              ? "border-brilliant/30 bg-brilliant/10"
+              : "border-border bg-surface",
+          )}
+        >
           <div className="flex items-center gap-2">
-            <Badge tone={brilliant.sacrifice || brilliant.mate ? "brilliant" : "best"}>
-              {brilliant.sacrifice || brilliant.mate ? "Brilliant line" : "Best line"}
+            <Badge tone={brilliant.sacrifice ? "brilliant" : "best"}>
+              {brilliant.sacrifice ? "Brilliant" : "Best"}
             </Badge>
             <span className="font-mono text-sm tabular-nums">{brilliant.san}</span>
           </div>

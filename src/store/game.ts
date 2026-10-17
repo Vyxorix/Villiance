@@ -119,7 +119,7 @@ const initial: GameState = {
   lines: [],
   evalScore: null,
   brilliant: null,
-  movetime: 350,
+  movetime: 480,
   showCoords: true,
   sound: true,
   lastMove: null,

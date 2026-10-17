@@ -29,14 +29,17 @@ export function useEngineBridge() {
     }
     const id = ++gen.current;
     const engine = getEngine();
-    useGame.getState().setThinking(true);
+    const stored = useGame.getState().cursor > 0
+      ? (useGame.getState().plies[useGame.getState().cursor - 1]?.evalAfter ?? null)
+      : null;
+    useGame.setState({ thinking: true, lines: [], brilliant: null, evalScore: stored });
     let playTimer: number | undefined;
     void (async () => {
       try {
         await engine.start();
         if (id !== gen.current) return;
         useGame.getState().setEngineReady(true);
-        const result = await engine.analyze(fen, { movetime, multipv: 4 });
+        const result = await engine.analyze(fen, { movetime, multipv: 3 });
         if (id !== gen.current) return;
         useGame.getState().applyAnalysis(result, fen);
         const s = useGame.getState();

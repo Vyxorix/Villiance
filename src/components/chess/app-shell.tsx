@@ -56,10 +56,18 @@ export function AppShell() {
         onPointerDown={() => resumeAudio()}
       >
         <header className="border-b border-border px-4 py-3 sm:px-6">
-          <div className="mx-auto flex max-w-[1180px] items-center justify-between gap-4">
-            <div>
-              <p className="font-display text-2xl leading-none tracking-tight">Brilliance</p>
-              <p className="mt-1 text-xs text-muted">Play, analyze, hunt the sacrifice.</p>
+          <div className="mx-auto flex max-w-[1180px] items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <span className="grid size-9 shrink-0 grid-cols-2 overflow-hidden rounded-[var(--radius-xs)] ring-1 ring-border" aria-hidden>
+                <span className="bg-board-light" />
+                <span className="bg-board-dark" />
+                <span className="bg-board-dark" />
+                <span className="bg-board-light" />
+              </span>
+              <div>
+                <p className="font-display text-2xl leading-none tracking-tight">Villiance</p>
+                <p className="mt-1 hidden text-xs text-muted sm:block">Best move first. Brilliant only when it is.</p>
+              </div>
             </div>
             <nav className="flex gap-1 rounded-[var(--radius-md)] bg-surface-2 p-1">
               <ModeBtn id="play" label="Play" active={mode === "play"} />
@@ -111,7 +119,7 @@ export function AppShell() {
                 <MoveList />
               </div>
               <div>
-                <p className="mb-2 text-[11px] font-medium tracking-wide text-subtle uppercase">Brilliancies</p>
+                <p className="mb-2 text-[11px] font-medium tracking-wide text-subtle uppercase">Studies</p>
                 <StudiesPanel />
               </div>
             </div>
@@ -142,8 +150,8 @@ function ModeBtn({ id, label, active }: { id: "play" | "analyze" | "study"; labe
       }}
       className={
         active
-          ? "h-9 rounded-[var(--radius-sm)] bg-surface px-3 text-sm font-medium"
-          : "h-9 rounded-[var(--radius-sm)] px-3 text-sm font-medium text-muted hover:text-fg"
+          ? "h-11 rounded-[var(--radius-sm)] bg-surface px-3 text-sm font-medium"
+          : "h-11 rounded-[var(--radius-sm)] px-3 text-sm font-medium text-muted hover:text-fg"
       }
     >
       {label}

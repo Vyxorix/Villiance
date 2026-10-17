@@ -25,6 +25,36 @@ function isLight(sq: Square) {
   return (file + rank) % 2 === 1;
 }
 
+function arrowPoints(x1: number, y1: number, x2: number, y2: number) {
+  const dx = x2 - x1;
+  const dy = y2 - y1;
+  const len = Math.hypot(dx, dy) || 1;
+  const ux = dx / len;
+  const uy = dy / len;
+  const px = -uy;
+  const py = ux;
+  const inset = Math.min(0.034, len * 0.22);
+  const head = Math.min(0.038, Math.max(0.02, len * 0.34));
+  const headW = head * 0.62;
+  const shaft = Math.min(0.0085, head * 0.22);
+  const sx = x1 + ux * inset;
+  const sy = y1 + uy * inset;
+  const ex = x2 - ux * inset;
+  const ey = y2 - uy * inset;
+  const bx = ex - ux * head;
+  const by = ey - uy * head;
+  const pts: Array<[number, number]> = [
+    [sx + px * shaft, sy + py * shaft],
+    [bx + px * shaft, by + py * shaft],
+    [bx + px * headW, by + py * headW],
+    [ex, ey],
+    [bx - px * headW, by - py * headW],
+    [bx - px * shaft, by - py * shaft],
+    [sx - px * shaft, sy - py * shaft],
+  ];
+  return pts.map(([x, y]) => `${x.toFixed(4)},${y.toFixed(4)}`).join(" ");
+}
+
 function squareCenter(sq: Square, orientation: Color) {
   const file = sq.charCodeAt(0) - 97;
   const rank = Number(sq[1]) - 1;
@@ -102,14 +132,14 @@ export function ChessBoard() {
   }, [dragging, sqFromPoint]);
 
   const arrowMoves: { from: Square; to: Square; kind: "best" | "brilliant" }[] = [];
-  if (brilliant) {
+  if (!dragging && brilliant) {
     const p = uciParts(brilliant.uci);
     arrowMoves.push({
       from: p.from,
       to: p.to,
-      kind: brilliant.sacrifice || brilliant.mate ? "brilliant" : "best",
+      kind: brilliant.sacrifice ? "brilliant" : "best",
     });
-  } else if (lines[0]?.pv[0]) {
+  } else if (!dragging && lines[0]?.pv[0]) {
     const p = uciParts(lines[0].pv[0]);
     arrowMoves.push({ from: p.from, to: p.to, kind: "best" });
   }
@@ -198,34 +228,23 @@ export function ChessBoard() {
         </div>
 
         <svg className="pointer-events-none absolute inset-0 z-20 h-full w-full" viewBox="0 0 1 1">
-          <defs>
-            <marker id="arrow-best" markerWidth="7" markerHeight="7" refX="5" refY="3.5" orient="auto">
-              <polygon points="0 0, 7 3.5, 0 7" className="fill-great" />
-            </marker>
-            <marker id="arrow-brilliant" markerWidth="7" markerHeight="7" refX="5" refY="3.5" orient="auto">
-              <polygon points="0 0, 7 3.5, 0 7" className="fill-brilliant" />
-            </marker>
-          </defs>
           {arrowMoves.map((a) => {
             const s = squareCenter(a.from, orientation);
             const t = squareCenter(a.to, orientation);
-            const dx = t.x - s.x;
-            const dy = t.y - s.y;
-            const len = Math.hypot(dx, dy) || 1;
-            const shrink = 0.07;
-            const x2 = t.x - (dx / len) * shrink;
-            const y2 = t.y - (dy / len) * shrink;
+            const points = arrowPoints(s.x, s.y, t.x, t.y);
+            const brilliant = a.kind === "brilliant";
             return (
-              <line
+              <polygon
                 key={`${a.from}${a.to}${a.kind}`}
-                x1={s.x}
-                y1={s.y}
-                x2={x2}
-                y2={y2}
-                strokeWidth={0.028}
-                strokeLinecap="round"
-                className={a.kind === "brilliant" ? "stroke-brilliant/85" : "stroke-great/70"}
-                markerEnd={a.kind === "brilliant" ? "url(#arrow-brilliant)" : "url(#arrow-best)"}
+                points={points}
+                strokeWidth={0.006}
+                strokeLinejoin="round"
+                className={
+                  brilliant
+                    ? "fill-brilliant stroke-arrow-edge"
+                    : "fill-arrow stroke-arrow-edge"
+                }
+                opacity={0.92}
               />
             );
           })}
