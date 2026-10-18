@@ -175,6 +175,10 @@ export default defineConfig(({ command, isPreview }) => ({
             // manifest + head-tag middleware). Nitro v3 defaults serverDir to
             // false, so removing this silently unwires /?install=1 on deploys.
             serverDir: "./server",
+            // Radix chunks import tslib. Leaving it external makes the Vercel
+            // function 500 with "Cannot find package 'tslib'" whenever the
+            // function directory has no installed node_modules.
+            noExternals: ["tslib"],
           }),
         ]
       : []),
