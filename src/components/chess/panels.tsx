@@ -22,12 +22,11 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Slider } from "@/components/ui/slider";
 import { Textarea } from "@/components/ui/textarea";
 import { capturedPieces, formatScore, pieceSrc, statusText } from "@/lib/chess/helpers";
 import { STUDIES } from "@/lib/chess/studies";
 import { cn } from "@/lib/utils";
-import { useGame, usePosition } from "@/store/game";
+import { showSuggestions, useGame, usePosition } from "@/store/game";
 import type { Classification } from "@/lib/chess/types";
 
 const CLASS_LABEL: Record<Classification, string> = {
@@ -54,9 +53,12 @@ export function GameToolbar() {
   const cursor = useGame((s) => s.cursor);
   const len = useGame((s) => s.plies.length);
   const sound = useGame((s) => s.sound);
-  const engineOn = useGame((s) => s.engineOn);
+  const mode = useGame((s) => s.mode);
+  const studyMiss = useGame((s) => s.studyMiss);
+  const studySolved = useGame((s) => s.studySolved);
   const thinking = useGame((s) => s.thinking);
   const brilliant = useGame((s) => s.brilliant);
+  const reveal = mode === "study" && (studyMiss || studySolved);
 
   return (
     <div className="flex flex-wrap items-center gap-1.5">
@@ -99,22 +101,17 @@ export function GameToolbar() {
         {sound ? <Volume2 className="size-4" /> : <VolumeX className="size-4" />}
       </Button>
       <div className="ml-auto flex items-center gap-1.5">
-        <Button
-          variant="outline"
-          size="sm"
-          disabled={!brilliant || thinking}
-          onClick={() => useGame.getState().playHint()}
-        >
-          <Lightbulb className="size-3.5" />
-          Play line
-        </Button>
-        <Button
-          variant={engineOn ? "secondary" : "outline"}
-          size="sm"
-          onClick={() => useGame.getState().setEngineOn(!engineOn)}
-        >
-          {engineOn ? "Engine on" : "Engine off"}
-        </Button>
+        {reveal && (
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={!brilliant || thinking}
+            onClick={() => useGame.getState().playHint()}
+          >
+            <Lightbulb className="size-3.5" />
+            Show move
+          </Button>
+        )}
       </div>
     </div>
   );
@@ -225,37 +222,49 @@ export function EnginePanel() {
   const lines = useGame((s) => s.lines);
   const brilliant = useGame((s) => s.brilliant);
   const evalScore = useGame((s) => s.evalScore);
-  const movetime = useGame((s) => s.movetime);
   const opening = useGame((s) => s.opening);
+  const mode = useGame((s) => s.mode);
+  const studyMiss = useGame((s) => s.studyMiss);
+  const studySolved = useGame((s) => s.studySolved);
   const chess = usePosition();
   const status = statusText(chess);
   const turn = chess.turn();
+  const hints = showSuggestions({ mode, studyMiss, studySolved });
+  const playerColor = useGame((s) => s.playerColor);
+  const engineTurn = mode === "play" && turn !== playerColor && !chess.isGameOver();
 
   return (
     <div className="flex flex-col gap-3">
       <div className="rounded-[var(--radius-lg)] border border-border bg-surface p-4">
         <div className="flex items-start justify-between gap-3">
           <div>
-            <p className="text-[11px] font-medium tracking-wide text-subtle uppercase">Opening</p>
+            <p className="text-xs font-medium tracking-wide text-subtle uppercase">
+              {mode === "play" ? "Vs engine" : mode === "analyze" ? "Suggest only" : "Study"}
+            </p>
             <p className="mt-0.5 font-display text-lg leading-snug">{opening ?? "—"}</p>
           </div>
           <div className="text-right">
-            <p className="text-[11px] font-medium tracking-wide text-subtle uppercase">Eval</p>
+            <p className="text-xs font-medium tracking-wide text-subtle uppercase">Eval</p>
             <p className="mt-0.5 font-mono text-lg tabular-nums">{formatScore(evalScore)}</p>
           </div>
         </div>
         {status && <p className="mt-2 text-sm text-brilliant">{status}</p>}
         {!ready && <p className="mt-2 text-sm text-muted">Waking Stockfish…</p>}
-        {ready && thinking && <p className="mt-2 text-sm text-muted">Searching forcing lines…</p>}
+        {ready && engineTurn && (
+          <p className="mt-2 text-sm text-muted">{thinking ? "Villiance is moving…" : "Villiance to move."}</p>
+        )}
+        {ready && mode === "play" && !engineTurn && !status && (
+          <p className="mt-2 text-sm text-muted">Your move. No suggestions on this board.</p>
+        )}
+        {ready && mode === "analyze" && thinking && <p className="mt-2 text-sm text-muted">Looking for the move to play on the other board…</p>}
+        {ready && mode === "study" && !hints && <p className="mt-2 text-sm text-muted">The answer stays hidden until you try.</p>}
       </div>
 
-      {brilliant && (
+      {hints && brilliant && (
         <div
           className={cn(
             "rounded-[var(--radius-lg)] border p-4",
-            brilliant.sacrifice
-              ? "border-brilliant/30 bg-brilliant/10"
-              : "border-border bg-surface",
+            brilliant.sacrifice ? "border-brilliant/30 bg-brilliant/10" : "border-border bg-surface",
           )}
         >
           <div className="flex items-center gap-2">
@@ -271,38 +280,27 @@ export function EnginePanel() {
         </div>
       )}
 
-      <div className="rounded-[var(--radius-lg)] border border-border bg-surface p-4">
-        <p className="mb-2 text-[11px] font-medium tracking-wide text-subtle uppercase">Engine lines</p>
-        {lines.length === 0 ? (
-          <p className="text-sm text-muted">{ready ? "No lines yet." : "Engine loading."}</p>
-        ) : (
-          <ul className="flex flex-col gap-2">
-            {lines.slice(0, 4).map((line) => (
-              <li key={line.multipv} className="flex gap-3 text-sm">
-                <span className="w-10 shrink-0 font-mono text-xs tabular-nums text-muted">
-                  {formatScore(turn === "w" ? line.score : { type: line.score.type, value: -line.score.value })}
-                </span>
-                <span className="min-w-0 font-mono text-xs leading-relaxed text-fg/90">
-                  {line.san.slice(0, 8).join(" ")}
-                </span>
-              </li>
-            ))}
-          </ul>
-        )}
-        <div className="mt-4">
-          <div className="mb-1 flex items-center justify-between text-xs text-muted">
-            <span>Think time</span>
-            <span className="font-mono tabular-nums">{movetime} ms</span>
-          </div>
-          <Slider
-            min={120}
-            max={1200}
-            step={20}
-            value={[movetime]}
-            onValueChange={(v) => useGame.getState().setMovetime(v[0] ?? 350)}
-          />
+      {hints && (
+        <div className="rounded-[var(--radius-lg)] border border-border bg-surface p-4">
+          <p className="mb-2 text-xs font-medium tracking-wide text-subtle uppercase">Engine lines</p>
+          {lines.length === 0 ? (
+            <p className="text-sm text-muted">{ready ? "No lines yet." : "Engine loading."}</p>
+          ) : (
+            <ul className="flex flex-col gap-2">
+              {lines.slice(0, 3).map((line) => (
+                <li key={line.multipv} className="flex gap-3 text-sm">
+                  <span className="w-10 shrink-0 font-mono text-xs tabular-nums text-muted">
+                    {formatScore(turn === "w" ? line.score : { type: line.score.type, value: -line.score.value })}
+                  </span>
+                  <span className="min-w-0 font-mono text-xs leading-relaxed text-fg/90">
+                    {line.san.slice(0, 8).join(" ")}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
-      </div>
+      )}
     </div>
   );
 }
@@ -352,20 +350,11 @@ export function StudiesPanel() {
 export function NewGameBar() {
   return (
     <div className="flex flex-wrap gap-2">
-      <Button size="sm" onClick={() => useGame.getState().newGame({ color: "w", mode: "play" })}>
-        Play white
-      </Button>
-      <Button size="sm" variant="secondary" onClick={() => useGame.getState().newGame({ color: "b", mode: "play" })}>
-        Play black
-      </Button>
-      <Button size="sm" variant="outline" onClick={() => useGame.getState().newGame({ color: "w", mode: "analyze" })}>
-        Analyze
-      </Button>
-      <Button size="sm" variant="ghost" onClick={() => useGame.getState().setImportOpen(true)}>
+      <Button size="sm" variant="outline" onClick={() => useGame.getState().setImportOpen(true)}>
         Import
       </Button>
       <Button
-        size="icon-sm"
+        size="sm"
         variant="ghost"
         aria-label="Copy PGN"
         onClick={async () => {
@@ -375,6 +364,7 @@ export function NewGameBar() {
         }}
       >
         <ClipboardCopy className="size-4" />
+        Copy PGN
       </Button>
     </div>
   );

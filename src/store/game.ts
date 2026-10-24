@@ -8,6 +8,7 @@ import { isBookMove, openingName } from "@/lib/chess/openings";
 import { loadPersist, savePersist } from "@/lib/chess/persist";
 import { playMoveSound, resumeAudio } from "@/lib/chess/sound";
 import { STUDIES } from "@/lib/chess/studies";
+import type { BoardThemeId, RoomId } from "@/lib/chess/appearance";
 import type {
   BrilliantHint,
   Color,
@@ -21,6 +22,18 @@ import type {
 } from "@/lib/chess/types";
 
 export type PendingPromotion = { from: Sq; to: Sq };
+
+export type Screen = "home" | "settings" | "board";
+
+export function showSuggestions(s: {
+  mode: GameMode;
+  studyMiss: boolean;
+  studySolved: boolean;
+}): boolean {
+  if (s.mode === "analyze") return true;
+  if (s.mode === "study") return s.studyMiss || s.studySolved;
+  return false;
+}
 
 type GameState = {
   startFen: string;
@@ -49,6 +62,11 @@ type GameState = {
   importOpen: boolean;
   hoverDest: Sq | null;
   dragging: Sq | null;
+  screen: Screen;
+  settingsBack: "home" | "board";
+  boardTheme: BoardThemeId;
+  room: RoomId;
+  customBg: string;
 };
 
 type GameActions = {
@@ -80,6 +98,14 @@ type GameActions = {
   setImportOpen: (on: boolean) => void;
   setHoverDest: (sq: Sq | null) => void;
   setDragging: (sq: Sq | null) => void;
+  setScreen: (screen: Screen) => void;
+  openSettings: () => void;
+  setBoardTheme: (theme: BoardThemeId) => void;
+  setRoom: (room: RoomId) => void;
+  setCustomBg: (hex: string) => void;
+  startVs: (color: Color | "random") => void;
+  startSuggest: () => void;
+  startStudies: () => void;
   canMove: (color: Color) => boolean;
   pgn: () => string;
 };
@@ -130,6 +156,11 @@ const initial: GameState = {
   importOpen: false,
   hoverDest: null,
   dragging: null,
+  screen: "home",
+  settingsBack: "home",
+  boardTheme: "sage",
+  room: "ink",
+  customBg: "#1a1c28",
 };
 
 export const useGame = create<GameState & GameActions>((set, get) => ({
@@ -143,6 +174,9 @@ export const useGame = create<GameState & GameActions>((set, get) => ({
         sound: saved.sound,
         showCoords: saved.showCoords,
         engineOn: saved.engineOn,
+        boardTheme: saved.boardTheme,
+        room: saved.room,
+        customBg: saved.customBg,
       });
       return;
     }
@@ -170,25 +204,28 @@ export const useGame = create<GameState & GameActions>((set, get) => ({
         cursor,
         orientation: saved.orientation,
         playerColor: saved.playerColor,
-        mode: saved.mode === "study" ? "analyze" : saved.mode,
+        mode: saved.mode,
         engineOn: saved.engineOn,
         movetime: saved.movetime,
         sound: saved.sound,
         showCoords: saved.showCoords,
+        boardTheme: saved.boardTheme,
+        room: saved.room,
+        customBg: saved.customBg,
         lastMove: lastFromPlies(plies, cursor),
         opening: openingName(plies.slice(0, cursor).map((p) => p.san)),
         selected: null,
         dests: [],
       });
     } catch {
-      set({ movetime: saved.movetime, sound: saved.sound, showCoords: saved.showCoords });
+      set({ movetime: saved.movetime, sound: saved.sound, showCoords: saved.showCoords, boardTheme: saved.boardTheme, room: saved.room, customBg: saved.customBg });
     }
   },
 
   persistNow: () => {
     const s = get();
     savePersist({
-      version: 1,
+      version: 2,
       pgn: s.pgn(),
       startFen: s.startFen === DEFAULT_POSITION ? "" : s.startFen,
       cursor: s.cursor,
@@ -199,6 +236,9 @@ export const useGame = create<GameState & GameActions>((set, get) => ({
       movetime: s.movetime,
       sound: s.sound,
       showCoords: s.showCoords,
+      boardTheme: s.boardTheme,
+      room: s.room,
+      customBg: s.customBg,
     });
   },
 
@@ -277,6 +317,7 @@ export const useGame = create<GameState & GameActions>((set, get) => ({
         opening: openingName(plies.map((p) => p.san)),
         studyId: null,
         importOpen: false,
+        screen: "board",
       });
       get().persistNow();
       return null;
@@ -299,6 +340,7 @@ export const useGame = create<GameState & GameActions>((set, get) => ({
         opening: "Custom position",
         studyId: null,
         importOpen: false,
+        screen: "board",
       });
       get().persistNow();
       return null;
@@ -469,15 +511,60 @@ export const useGame = create<GameState & GameActions>((set, get) => ({
   },
 
   setMode: (mode) => set({ mode }),
-  setEngineOn: (engineOn) => set({ engineOn }),
-  setMovetime: (movetime) => set({ movetime }),
-  setSound: (sound) => set({ sound }),
-  setShowCoords: (showCoords) => set({ showCoords }),
+  setEngineOn: (engineOn) => {
+    set({ engineOn });
+    get().persistNow();
+  },
+  setMovetime: (movetime) => {
+    set({ movetime });
+    get().persistNow();
+  },
+  setSound: (sound) => {
+    set({ sound });
+    get().persistNow();
+  },
+  setShowCoords: (showCoords) => {
+    set({ showCoords });
+    get().persistNow();
+  },
   setEngineReady: (engineReady) => set({ engineReady }),
   setThinking: (thinking) => set({ thinking }),
   setImportOpen: (importOpen) => set({ importOpen }),
   setHoverDest: (hoverDest) => set({ hoverDest }),
   setDragging: (dragging) => set({ dragging }),
+  setScreen: (screen) => set({ screen }),
+  openSettings: () => {
+    const from = get().screen === "board" ? "board" : "home";
+    set({ screen: "settings", settingsBack: from });
+  },
+  setBoardTheme: (boardTheme) => {
+    set({ boardTheme });
+    get().persistNow();
+  },
+  setRoom: (room) => {
+    set({ room });
+    get().persistNow();
+  },
+  setCustomBg: (customBg) => {
+    set({ customBg, room: "custom" });
+    get().persistNow();
+  },
+  startVs: (color) => {
+    const picked = color === "random" ? (Math.random() < 0.5 ? "w" : "b") : color;
+    get().newGame({ color: picked, mode: "play" });
+    set({ screen: "board", engineOn: true });
+    get().persistNow();
+  },
+  startSuggest: () => {
+    get().newGame({ color: "w", mode: "analyze" });
+    set({ screen: "board", engineOn: true });
+    get().persistNow();
+  },
+  startStudies: () => {
+    const id = STUDIES[0]?.id;
+    if (id) get().loadStudy(id);
+    set({ screen: "board", engineOn: true });
+  },
 
   applyAnalysis: (result, fen) => {
     if (get().fen() !== fen) return;

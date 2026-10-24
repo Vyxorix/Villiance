@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { PieceSymbol, Square } from "chess.js";
 import { FILES, kingSquare, pieceSrc, uciParts } from "@/lib/chess/helpers";
 import { cn } from "@/lib/utils";
-import { useGame, usePosition } from "@/store/game";
+import { useGame, usePosition, showSuggestions } from "@/store/game";
 import type { Color, PromotionPiece } from "@/lib/chess/types";
 
 const PROMO: PromotionPiece[] = ["q", "n", "r", "b"];
@@ -70,6 +70,9 @@ export function ChessBoard() {
   const lastMove = useGame((s) => s.lastMove);
   const brilliant = useGame((s) => s.brilliant);
   const lines = useGame((s) => s.lines);
+  const mode = useGame((s) => s.mode);
+  const studyMiss = useGame((s) => s.studyMiss);
+  const studySolved = useGame((s) => s.studySolved);
   const showCoords = useGame((s) => s.showCoords);
   const pending = useGame((s) => s.pendingPromotion);
   const dragging = useGame((s) => s.dragging);
@@ -131,15 +134,16 @@ export function ChessBoard() {
     };
   }, [dragging, sqFromPoint]);
 
+  const hints = showSuggestions({ mode, studyMiss, studySolved });
   const arrowMoves: { from: Square; to: Square; kind: "best" | "brilliant" }[] = [];
-  if (!dragging && brilliant) {
+  if (hints && !dragging && brilliant) {
     const p = uciParts(brilliant.uci);
     arrowMoves.push({
       from: p.from,
       to: p.to,
       kind: brilliant.sacrifice ? "brilliant" : "best",
     });
-  } else if (!dragging && lines[0]?.pv[0]) {
+  } else if (hints && !dragging && lines[0]?.pv[0]) {
     const p = uciParts(lines[0].pv[0]);
     arrowMoves.push({ from: p.from, to: p.to, kind: "best" });
   }

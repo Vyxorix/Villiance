@@ -9,6 +9,7 @@ export function useEngineBridge() {
   const engineOn = useGame((s) => s.engineOn);
   const movetime = useGame((s) => s.movetime);
   const mode = useGame((s) => s.mode);
+  const screen = useGame((s) => s.screen);
   const playerColor = useGame((s) => s.playerColor);
   const plyCount = useGame((s) => s.plies.length);
   const fen = plyFen ?? startFen;
@@ -23,7 +24,7 @@ export function useEngineBridge() {
   }, []);
 
   useEffect(() => {
-    if (!engineOn) {
+    if (!engineOn || screen !== "board") {
       useGame.setState({ thinking: false, lines: [], brilliant: null });
       return;
     }
@@ -64,5 +65,5 @@ export function useEngineBridge() {
       engine.stop();
       if (playTimer) window.clearTimeout(playTimer);
     };
-  }, [fen, engineOn, movetime, mode, playerColor, plyCount, cursor]);
+  }, [fen, engineOn, movetime, mode, playerColor, plyCount, cursor, screen]);
 }
