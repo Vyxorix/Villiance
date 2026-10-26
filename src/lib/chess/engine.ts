@@ -60,6 +60,8 @@ export class StockfishEngine {
   private starting: Promise<void> | null = null;
   private pending: Pending | null = null;
   private searchId = 0;
+  /** Bestmoves produced by a cancelled search must not resolve the next one. */
+  private ignoreBestmoves = 0;
   private listeners = new Set<(line: string) => void>();
 
   get isReady() {
@@ -96,6 +98,12 @@ export class StockfishEngine {
   }
 
   stop(): void {
+    if (this.pending) {
+      this.ignoreBestmoves += 1;
+      const pending = this.pending;
+      this.pending = null;
+      pending.reject(new Error("Stopped"));
+    }
     this.post("stop");
   }
 
@@ -111,7 +119,13 @@ export class StockfishEngine {
     await this.start();
     this.searchId += 1;
     const id = this.searchId;
-    this.post("stop");
+    if (this.pending) {
+      this.ignoreBestmoves += 1;
+      const pending = this.pending;
+      this.pending = null;
+      pending.reject(new Error("Superseded"));
+      this.post("stop");
+    }
     const multipv = opts.multipv ?? 4;
     this.post(`setoption name MultiPV value ${multipv}`);
     this.post("ucinewgame");
@@ -126,11 +140,12 @@ export class StockfishEngine {
       }
       this.pending = { resolve, reject, lines: new Map(), fen };
       this.post(go);
+      const safety = opts.depth ? 20000 : (opts.movetime ?? 350) + 2500;
       window.setTimeout(() => {
         if (this.pending && id === this.searchId) {
           this.post("stop");
         }
-      }, (opts.movetime ?? 350) + 2500);
+      }, safety);
     });
   }
 
@@ -144,6 +159,10 @@ export class StockfishEngine {
     const info = parseInfo(line, this.pending.fen);
     if (info) this.pending.lines.set(info.multipv, info);
     if (line.startsWith("bestmove")) {
+      if (this.ignoreBestmoves > 0) {
+        this.ignoreBestmoves -= 1;
+        return;
+      }
       const parts = line.split(/\s+/);
       const bestmove = parts[1] && parts[1] !== "(none)" ? parts[1] : "";
       const ponder = parts[2] === "ponder" ? parts[3] : undefined;

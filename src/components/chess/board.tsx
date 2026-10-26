@@ -141,7 +141,7 @@ export function ChessBoard() {
     arrowMoves.push({
       from: p.from,
       to: p.to,
-      kind: brilliant.sacrifice ? "brilliant" : "best",
+      kind: brilliant.brilliant ? "brilliant" : "best",
     });
   } else if (hints && !dragging && lines[0]?.pv[0]) {
     const p = uciParts(lines[0].pv[0]);

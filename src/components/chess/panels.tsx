@@ -264,12 +264,12 @@ export function EnginePanel() {
         <div
           className={cn(
             "rounded-[var(--radius-lg)] border p-4",
-            brilliant.sacrifice ? "border-brilliant/30 bg-brilliant/10" : "border-border bg-surface",
+            brilliant.brilliant ? "border-brilliant/30 bg-brilliant/10" : "border-border bg-surface",
           )}
         >
           <div className="flex items-center gap-2">
-            <Badge tone={brilliant.sacrifice ? "brilliant" : "best"}>
-              {brilliant.sacrifice ? "Brilliant" : "Best"}
+            <Badge tone={brilliant.brilliant ? "brilliant" : "best"}>
+              {brilliant.brilliant ? "Brilliant" : "Best"}
             </Badge>
             <span className="font-mono text-sm tabular-nums">{brilliant.san}</span>
           </div>

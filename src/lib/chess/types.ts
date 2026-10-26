@@ -42,8 +42,11 @@ export type BrilliantHint = {
   reason: string;
   pvSan: string[];
   score: Score;
+  /** The move gives up material. Not the same as a brilliant label. */
   sacrifice: boolean;
   mate: boolean;
+  brilliant: boolean;
+  confidence?: "high" | "medium" | "low";
 };
 
 export type Study = {

@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react";
+import { needsDeeperCheck } from "@/lib/chess/classify";
 import { getEngine } from "@/lib/chess/engine";
 import { useGame } from "@/store/game";
 
@@ -40,7 +41,7 @@ export function useEngineBridge() {
         await engine.start();
         if (id !== gen.current) return;
         useGame.getState().setEngineReady(true);
-        const result = await engine.analyze(fen, { movetime, multipv: 3 });
+        const result = await engine.analyze(fen, { movetime, multipv: 4 });
         if (id !== gen.current) return;
         useGame.getState().applyAnalysis(result, fen);
         const s = useGame.getState();
@@ -56,9 +57,22 @@ export function useEngineBridge() {
             if (id !== gen.current) return;
             useGame.getState().playHint();
           }, 260);
+          return;
         }
-      } catch {
+        if (s.mode !== "play" && needsDeeperCheck(fen, result.lines)) {
+          useGame.setState({ thinking: true });
+          const deeper = await engine.analyze(fen, {
+            movetime: Math.min(1600, Math.max(movetime, 480) + 500),
+            multipv: 4,
+          });
+          if (id !== gen.current) return;
+          useGame.getState().applyAnalysis(deeper, fen);
+        }
+      } catch (err) {
         if (id === gen.current) useGame.getState().setThinking(false);
+        const message = err instanceof Error ? err.message : "";
+        if (message === "Stopped" || message === "Superseded") return;
+        console.error(err);
       }
     })();
     return () => {
