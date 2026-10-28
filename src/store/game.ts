@@ -67,6 +67,11 @@ type GameState = {
   boardTheme: BoardThemeId;
   room: RoomId;
   customBg: string;
+  startEval: Score | null;
+  reviewOpen: boolean;
+  reviewing: boolean;
+  reviewProgress: number;
+  reviewId: number;
 };
 
 type GameActions = {
@@ -106,6 +111,7 @@ type GameActions = {
   startVs: (color: Color | "random") => void;
   startSuggest: () => void;
   startStudies: () => void;
+  setReviewOpen: (open: boolean) => void;
   canMove: (color: Color) => boolean;
   pgn: () => string;
 };
@@ -161,6 +167,11 @@ const initial: GameState = {
   boardTheme: "sage",
   room: "ink",
   customBg: "#1a1c28",
+  startEval: null,
+  reviewOpen: false,
+  reviewing: false,
+  reviewProgress: 0,
+  reviewId: 0,
 };
 
 export const useGame = create<GameState & GameActions>((set, get) => ({
@@ -284,6 +295,10 @@ export const useGame = create<GameState & GameActions>((set, get) => ({
       studyMiss: false,
       hoverDest: null,
       dragging: null,
+      startEval: null,
+      reviewing: false,
+      reviewProgress: 0,
+      reviewId: get().reviewId + 1,
     });
     get().persistNow();
   },
@@ -318,6 +333,10 @@ export const useGame = create<GameState & GameActions>((set, get) => ({
         studyId: null,
         importOpen: false,
         screen: "board",
+        startEval: null,
+        reviewing: false,
+        reviewProgress: 0,
+        reviewId: get().reviewId + 1,
       });
       get().persistNow();
       return null;
@@ -341,6 +360,10 @@ export const useGame = create<GameState & GameActions>((set, get) => ({
         studyId: null,
         importOpen: false,
         screen: "board",
+        startEval: null,
+        reviewing: false,
+        reviewProgress: 0,
+        reviewId: get().reviewId + 1,
       });
       get().persistNow();
       return null;
@@ -368,6 +391,10 @@ export const useGame = create<GameState & GameActions>((set, get) => ({
       studySolved: false,
       studyMiss: false,
       engineOn: true,
+      startEval: null,
+      reviewing: false,
+      reviewProgress: 0,
+      reviewId: get().reviewId + 1,
     });
   },
 
@@ -565,8 +592,10 @@ export const useGame = create<GameState & GameActions>((set, get) => ({
     if (id) get().loadStudy(id);
     set({ screen: "board", engineOn: true });
   },
+  setReviewOpen: (reviewOpen) => set({ reviewOpen }),
 
   applyAnalysis: (result, fen) => {
+    if (get().reviewing) return;
     if (get().fen() !== fen) return;
     const chess = get().chess();
     const turn = chess.turn();
@@ -579,7 +608,14 @@ export const useGame = create<GameState & GameActions>((set, get) => ({
     if (idx >= 0 && plies[idx]) {
       plies[idx] = { ...plies[idx], evalAfter: evalScore ?? undefined };
     }
-    set({ lines, evalScore, brilliant, thinking: false, plies });
+    set({
+      lines,
+      evalScore,
+      brilliant,
+      thinking: false,
+      plies,
+      startEval: idx < 0 && evalScore ? evalScore : get().startEval,
+    });
   },
 }));
 

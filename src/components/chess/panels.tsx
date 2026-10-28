@@ -350,6 +350,9 @@ export function StudiesPanel() {
 export function NewGameBar() {
   return (
     <div className="flex flex-wrap gap-2">
+      <Button size="sm" onClick={() => useGame.getState().setReviewOpen(true)}>
+        Review
+      </Button>
       <Button size="sm" variant="outline" onClick={() => useGame.getState().setImportOpen(true)}>
         Import
       </Button>

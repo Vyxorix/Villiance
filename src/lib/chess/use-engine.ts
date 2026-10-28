@@ -11,6 +11,7 @@ export function useEngineBridge() {
   const movetime = useGame((s) => s.movetime);
   const mode = useGame((s) => s.mode);
   const screen = useGame((s) => s.screen);
+  const reviewing = useGame((s) => s.reviewing);
   const playerColor = useGame((s) => s.playerColor);
   const plyCount = useGame((s) => s.plies.length);
   const fen = plyFen ?? startFen;
@@ -29,6 +30,7 @@ export function useEngineBridge() {
       useGame.setState({ thinking: false, lines: [], brilliant: null });
       return;
     }
+    if (reviewing) return;
     const id = ++gen.current;
     const engine = getEngine();
     const stored = useGame.getState().cursor > 0
@@ -76,8 +78,9 @@ export function useEngineBridge() {
       }
     })();
     return () => {
-      engine.stop();
       if (playTimer) window.clearTimeout(playTimer);
+      if (useGame.getState().reviewing) return;
+      engine.stop();
     };
-  }, [fen, engineOn, movetime, mode, playerColor, plyCount, cursor, screen]);
+  }, [fen, engineOn, movetime, mode, playerColor, plyCount, cursor, screen, reviewing]);
 }

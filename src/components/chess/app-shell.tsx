@@ -14,6 +14,7 @@ import {
   NewGameBar,
   StudiesPanel,
 } from "@/components/chess/panels";
+import { ReviewDialog } from "@/components/chess/review-dialog";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -150,6 +151,7 @@ export function AppShell() {
           <HomeScreen />
         )}
         <ImportDialog />
+        <ReviewDialog />
         <Toaster theme={roomInk(room, customBg) === "light" ? "light" : "dark"} position="bottom-center" richColors={false} />
       </div>
     </TooltipProvider>
