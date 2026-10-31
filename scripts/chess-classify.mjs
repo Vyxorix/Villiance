@@ -13,6 +13,7 @@ const {
   immediateGain,
   assessBrilliant,
   classifyFromLines,
+  labelFromEvals,
   needsDeeperCheck,
   pickBrilliant,
 } = await server.ssrLoadModule("/src/lib/chess/classify.ts");
@@ -132,6 +133,30 @@ try {
   ];
   assert.equal(classifyFromLines(GREEK, "a2a3", similar, false), "best");
   assert.equal(assessBrilliant(GREEK, "a2a3", similar, { book: false }).brilliant, false);
+
+  // A move the searched lines never saw is not automatically a mistake.
+  assert.equal(classifyFromLines(START, "a2a3", ordinaryBest, false), "good");
+  // e4 and Nf3 are almost the same evaluation, so Nf3 is not a mistake.
+  const knight = classifyFromLines(START, "g1f3", ordinaryBest, false);
+  assert.ok(knight === "best" || knight === "excellent", knight);
+
+  // Already winning: +8 to +5 is a few percent, not a blunder.
+  const slip = labelFromEvals({
+    book: false,
+    before: cp(800),
+    after: cp(500),
+    mover: "w",
+  });
+  assert.notEqual(slip, "blunder");
+  assert.notEqual(slip, "mistake");
+
+  const collapse = labelFromEvals({
+    book: false,
+    before: cp(40),
+    after: cp(-400),
+    mover: "w",
+  });
+  assert.equal(collapse, "blunder");
 
   console.log("chess classify tests passed");
 } finally {

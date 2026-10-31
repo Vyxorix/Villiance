@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import { Chess, DEFAULT_POSITION, type Square } from "chess.js";
 import { create } from "zustand";
-import { classifyFromLines, pickBrilliant } from "@/lib/chess/classify";
+import { classifyFromLines, labelFromEvals, pickBrilliant } from "@/lib/chess/classify";
 import type { AnalyzeResult } from "@/lib/chess/engine";
 import { kingSquare, statusText, toUci, uciParts } from "@/lib/chess/helpers";
 import { isBookMove, openingName } from "@/lib/chess/openings";
@@ -72,6 +72,7 @@ type GameState = {
   reviewing: boolean;
   reviewProgress: number;
   reviewId: number;
+  reportedAccuracy: { w: number; b: number } | null;
 };
 
 type GameActions = {
@@ -172,6 +173,7 @@ const initial: GameState = {
   reviewing: false,
   reviewProgress: 0,
   reviewId: 0,
+  reportedAccuracy: null,
 };
 
 export const useGame = create<GameState & GameActions>((set, get) => ({
@@ -299,6 +301,7 @@ export const useGame = create<GameState & GameActions>((set, get) => ({
       reviewing: false,
       reviewProgress: 0,
       reviewId: get().reviewId + 1,
+      reportedAccuracy: null,
     });
     get().persistNow();
   },
@@ -337,6 +340,7 @@ export const useGame = create<GameState & GameActions>((set, get) => ({
         reviewing: false,
         reviewProgress: 0,
         reviewId: get().reviewId + 1,
+        reportedAccuracy: null,
       });
       get().persistNow();
       return null;
@@ -364,6 +368,7 @@ export const useGame = create<GameState & GameActions>((set, get) => ({
         reviewing: false,
         reviewProgress: 0,
         reviewId: get().reviewId + 1,
+        reportedAccuracy: null,
       });
       get().persistNow();
       return null;
@@ -395,6 +400,7 @@ export const useGame = create<GameState & GameActions>((set, get) => ({
       reviewing: false,
       reviewProgress: 0,
       reviewId: get().reviewId + 1,
+      reportedAccuracy: null,
     });
   },
 
@@ -605,8 +611,24 @@ export const useGame = create<GameState & GameActions>((set, get) => ({
     const brilliant = pickBrilliant(fen, lines);
     const plies = get().plies.slice();
     const idx = get().cursor - 1;
-    if (idx >= 0 && plies[idx]) {
-      plies[idx] = { ...plies[idx], evalAfter: evalScore ?? undefined };
+    if (idx >= 0 && plies[idx] && evalScore) {
+      const before = idx === 0 ? get().startEval : plies[idx - 1]?.evalAfter;
+      const existing = plies[idx].classification;
+      plies[idx] = {
+        ...plies[idx],
+        evalAfter: evalScore,
+        classification:
+          before && existing !== "book"
+            ? labelFromEvals({
+                book: false,
+                before,
+                after: evalScore,
+                mover: idx % 2 === 0 ? "w" : "b",
+                brilliant: existing === "brilliant",
+                great: existing === "great",
+              })
+            : existing,
+      };
     }
     set({
       lines,

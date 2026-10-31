@@ -1,6 +1,6 @@
 import { Chess, type Color, type PieceSymbol, type Square } from "chess.js";
 import type { BrilliantHint, Classification, EngineLine, Score } from "./types";
-import { cpValue, uciParts } from "./helpers";
+import { cpValue, evalToWhitePct, uciParts } from "./helpers";
 
 const VAL: Record<PieceSymbol, number> = {
   p: 100,
@@ -314,21 +314,82 @@ export function needsDeeperCheck(fen: string, lines: EngineLine[]): boolean {
   return assessBrilliant(fen, uci, lines, { book: false }).rejected === "shallow";
 }
 
-export function classifyMove(
-  best: Score | null,
-  played: Score | null,
-  opts: { book: boolean; onlyMove: boolean },
-): Classification {
-  if (opts.book) return "book";
-  if (!best || !played) return "good";
-  const loss = cpValue(best) - cpValue(played);
-  if (opts.onlyMove && loss <= 20) return "great";
-  if (loss <= 8) return "best";
-  if (loss <= 25) return "excellent";
-  if (loss <= 55) return "good";
-  if (loss <= 110) return "inaccuracy";
-  if (loss <= 280) return "mistake";
+/**
+ * How much winning chance the mover gave away, in percentage points.
+ * Uses the published Lichess win-percent curve, not raw centipawns, so a
+ * slip in a already-won position is not called a blunder.
+ */
+export function winChanceLoss(before: Score, after: Score, mover: Color): number {
+  const beforeP = mover === "w" ? evalToWhitePct(before) : 1 - evalToWhitePct(before);
+  const afterP = mover === "w" ? evalToWhitePct(after) : 1 - evalToWhitePct(after);
+  return Math.max(0, (beforeP - afterP) * 100);
+}
+
+/** Loss between two scores that are already from the mover's point of view. */
+export function lineLoss(best: Score, played: Score): number {
+  return Math.max(0, (evalToWhitePct(best) - evalToWhitePct(played)) * 100);
+}
+
+function band(loss: number): Classification {
+  if (loss <= 2) return "excellent";
+  if (loss <= 5) return "good";
+  if (loss <= 10) return "inaccuracy";
+  if (loss <= 20) return "mistake";
   return "blunder";
+}
+
+function greatGap(best: Score, second: Score | undefined): boolean {
+  if (!second) return false;
+  const gap = evalToWhitePct(best) - evalToWhitePct(second);
+  return gap >= 0.1 && evalToWhitePct(second) < 0.97;
+}
+
+/**
+ * Label from the eval before the move and the eval after it, both from White's
+ * point of view. This is the same comparison a full game review uses.
+ */
+export function labelFromEvals(opts: {
+  book: boolean;
+  before: Score;
+  after: Score;
+  mover: Color;
+  playedUci?: string;
+  bestUci?: string;
+  brilliant?: boolean;
+  great?: boolean;
+}): Classification {
+  if (opts.book) return "book";
+  const loss = winChanceLoss(opts.before, opts.after, opts.mover);
+  const isBest = Boolean(opts.bestUci && opts.playedUci && opts.playedUci === opts.bestUci);
+  if (opts.brilliant && loss <= 3) return "brilliant";
+  if (opts.great && loss <= 3) return "great";
+  if (isBest && loss <= 4) return "best";
+  if (loss <= 0.8) return "best";
+  return band(loss);
+}
+
+export function classifyFromLines(
+  fen: string,
+  playedUci: string,
+  lines: EngineLine[],
+  book: boolean,
+): Classification {
+  if (lines.length === 0) return book ? "book" : "good";
+  const best = lines[0];
+  if (!best) return book ? "book" : "good";
+  if (book) return "book";
+  const verdict = assessBrilliant(fen, playedUci, lines, { book: false });
+  const matched = lines.find((line) => line.pv[0] === playedUci);
+  const playedBest = best.pv[0] === playedUci;
+  const loss = matched ? lineLoss(best.score, matched.score) : null;
+  if (verdict.brilliant && (playedBest || (loss !== null && loss <= 2))) return "brilliant";
+  if (playedBest && greatGap(best.score, lines[1]?.score)) return "great";
+  if (playedBest) return "best";
+  // Not in the searched lines yet. Wait for the position after the move
+  // instead of calling every unlisted move a mistake.
+  if (loss === null) return "good";
+  if (loss <= 0.8) return "best";
+  return band(loss);
 }
 
 export function pickBrilliant(fen: string, lines: EngineLine[]): BrilliantHint | null {
@@ -350,26 +411,4 @@ export function pickBrilliant(fen: string, lines: EngineLine[]): BrilliantHint |
     brilliant: verdict.brilliant,
     confidence: verdict.confidence,
   };
-}
-
-export function classifyFromLines(
-  fen: string,
-  playedUci: string,
-  lines: EngineLine[],
-  book: boolean,
-): Classification {
-  if (lines.length === 0) return book ? "book" : "good";
-  const best = lines[0];
-  if (!best) return book ? "book" : "good";
-  if (book) return "book";
-  const verdict = assessBrilliant(fen, playedUci, lines, { book: false });
-  if (verdict.brilliant) return "brilliant";
-  const match = lines.find((line) => line.pv[0] === playedUci);
-  const sacrifice = sacrificeCentipawns(fen, playedUci) >= BRILLIANT.minSacCp;
-  const onlyMove = lines.length > 1 && best.pv[0] === playedUci && cpValue(best.score) - cpValue(lines[1]!.score) >= 180;
-  if (!match) {
-    if (best.depth < 8) return "good";
-    return sacrifice || best.depth >= 10 ? "mistake" : "good";
-  }
-  return classifyMove(best.score, match.score, { book: false, onlyMove });
 }

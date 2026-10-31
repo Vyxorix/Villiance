@@ -1,9 +1,9 @@
 import { Chess } from "chess.js";
-import { classifyFromLines } from "@/lib/chess/classify";
+import { assessBrilliant, labelFromEvals } from "@/lib/chess/classify";
 import { getEngine } from "@/lib/chess/engine";
-import { whiteScore } from "@/lib/chess/helpers";
+import { evalToWhitePct, whiteScore } from "@/lib/chess/helpers";
 import { isBookMove } from "@/lib/chess/openings";
-import type { Ply, Score } from "@/lib/chess/types";
+import type { EngineLine, Ply, Score } from "@/lib/chess/types";
 import { useGame } from "@/store/game";
 
 function fenAt(startFen: string, plies: Ply[], cursor: number): string {
@@ -30,37 +30,69 @@ export async function runReview(force = false): Promise<void> {
   const sig = plies.map((p) => p.uci).join(" ");
   let startEval: Score | null = started.startEval;
   const steps = plies.length + 1;
+  let prev: { fen: string; lines: EngineLine[]; evalWhite: Score; bestUci: string } | null = null;
 
   const current = () => {
     const s = useGame.getState();
     return s.reviewId === id && s.plies.map((p) => p.uci).join(" ") === sig;
   };
 
+  const labelPlayed = (index: number, after: Score) => {
+    const ply = plies[index];
+    if (!ply || !prev) return;
+    const sans = plies.slice(0, index + 1).map((p) => p.san);
+    const book = isBookMove(sans);
+    const best = prev.lines[0];
+    const second = prev.lines[1];
+    const verdict = prev.lines.length
+      ? assessBrilliant(prev.fen, ply.uci, prev.lines, { book: false })
+      : null;
+    const gap = best && second ? evalToWhitePct(best.score) - evalToWhitePct(second.score) : 0;
+    const great = Boolean(
+      best &&
+        ply.uci === best.pv[0] &&
+        second &&
+        gap >= 0.1 &&
+        evalToWhitePct(second.score) < 0.97,
+    );
+    plies[index] = {
+      ...ply,
+      evalAfter: after,
+      classification: labelFromEvals({
+        book,
+        before: prev.evalWhite,
+        after,
+        mover: index % 2 === 0 ? "w" : "b",
+        playedUci: ply.uci,
+        bestUci: prev.bestUci,
+        brilliant: Boolean(verdict?.brilliant) || ply.classification === "brilliant",
+        great: great || ply.classification === "great",
+      }),
+    };
+  };
+
   try {
     await engine.start();
     for (let i = 0; i < steps; i++) {
       if (!current()) break;
-      const haveEval = i === 0 ? startEval : plies[i - 1]?.evalAfter;
-      const needClass = i < plies.length && !plies[i]?.classification;
-      if (!force && haveEval && !needClass) {
-        useGame.setState({ reviewProgress: i + 1 });
-        continue;
-      }
       const fen = fenAt(started.startFen, plies, i);
-      const movetime = Math.min(220, Math.max(120, useGame.getState().movetime));
-      const result = await engine.analyze(fen, { movetime, multipv: 3 });
-      if (!current()) break;
-      const best = result.lines[0];
-      const turn = new Chess(fen).turn();
-      const evalScore = best ? whiteScore(best.score, turn) : null;
+      const haveEval = i === 0 ? startEval : plies[i - 1]?.evalAfter;
+      const needClass = i < plies.length && (force || !plies[i]?.classification);
+      let evalScore: Score | null = haveEval ?? null;
+      let lines: EngineLine[] = [];
+      if (force || !haveEval || needClass) {
+        const movetime = Math.min(320, Math.max(160, useGame.getState().movetime));
+        const result = await engine.analyze(fen, { movetime, multipv: 2 });
+        if (!current()) break;
+        const best = result.lines[0];
+        const turn = new Chess(fen).turn();
+        evalScore = best ? whiteScore(best.score, turn) : null;
+        lines = result.lines;
+      }
       if (i === 0) startEval = evalScore;
-      else if (plies[i - 1] && evalScore) plies[i - 1] = { ...plies[i - 1], evalAfter: evalScore };
-      if (i < plies.length && plies[i]) {
-        const sans = plies.slice(0, i + 1).map((p) => p.san);
-        plies[i] = {
-          ...plies[i],
-          classification: classifyFromLines(fen, plies[i].uci, result.lines, isBookMove(sans)),
-        };
+      else if (evalScore) labelPlayed(i - 1, evalScore);
+      if (evalScore) {
+        prev = { fen, lines, evalWhite: evalScore, bestUci: lines[0]?.pv[0] ?? "" };
       }
       useGame.setState({
         plies: plies.map((p) => ({ ...p })),

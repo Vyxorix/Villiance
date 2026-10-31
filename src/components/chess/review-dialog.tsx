@@ -106,6 +106,7 @@ export function ReviewDialog() {
   const reviewing = useGame((s) => s.reviewing);
   const progress = useGame((s) => s.reviewProgress);
   const opening = useGame((s) => s.opening);
+  const reported = useGame((s) => s.reportedAccuracy);
   const review = summarizeReview(plies, startEval);
   const names = sideNames(mode, playerColor);
   const done = reviewComplete(plies, startEval);
@@ -133,6 +134,11 @@ export function ReviewDialog() {
           <p className="pb-2 text-[11px] font-medium tracking-wide text-subtle uppercase">Accuracy</p>
           <ScoreBlock name={names.b} value={fmt(review.b.accuracy)} light={names.you === "b"} />
         </div>
+        {reported && (
+          <p className="mt-2 text-center text-xs text-subtle">
+            Chess.com reported {reported.w.toFixed(1)} / {reported.b.toFixed(1)}
+          </p>
+        )}
 
         <div className="mt-4 flex flex-col gap-1">
           {REVIEW_ORDER.map((key) => (

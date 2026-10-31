@@ -1,5 +1,6 @@
 import { Compass, Library, Settings2, Swords } from "lucide-react";
 import { BOARD_THEMES, ROOMS, inkOf, thinkLabel } from "@/lib/chess/appearance";
+import { ReviewHome } from "@/components/chess/review-home";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import { cn } from "@/lib/utils";
@@ -19,7 +20,7 @@ export function HomeScreen() {
         <div>
           <p className="font-display text-4xl leading-none tracking-tight sm:text-5xl">Villiance</p>
           <p className="mt-3 max-w-md text-sm leading-relaxed text-muted">
-            Play the engine, or keep a second board beside another game and take only the suggestions.
+            Play the engine, copy a game for suggestions, or review a score you paste.
           </p>
         </div>
         <Button variant="outline" size="icon" aria-label="Settings" onClick={() => useGame.getState().openSettings()}>
@@ -84,6 +85,8 @@ export function HomeScreen() {
             </div>
           </div>
         </button>
+
+        <ReviewHome />
 
         <button
           type="button"
