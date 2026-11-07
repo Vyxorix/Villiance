@@ -57,7 +57,7 @@ try {
     line(1, 5, mate(2), "f3e5", "Nxe5"),
     line(2, 5, cp(40), "d2d3", "d3"),
   ];
-  assert.equal(classifyFromLines(LEGAL, "f3e5", shallow, false), "great");
+  assert.equal(classifyFromLines(LEGAL, "f3e5", shallow, false), undefined);
   assert.equal(assessBrilliant(LEGAL, "f3e5", shallow, { book: false }).rejected, "shallow");
   assert.equal(needsDeeperCheck(LEGAL, shallow), true);
   assert.equal(needsDeeperCheck(LEGAL, soundLines), false);
@@ -96,7 +96,7 @@ try {
     line(1, 14, cp(30), "e2e4", "e4"),
     line(2, 14, cp(22), "g1f3", "Nf3"),
   ];
-  assert.equal(classifyFromLines(START, "e2e4", ordinaryBest, false), "best");
+  assert.equal(classifyFromLines(START, "e2e4", ordinaryBest, false), undefined);
   assert.equal(pickBrilliant(START, ordinaryBest).brilliant, false);
 
   assert.equal(classifyFromLines(START, "e2e4", ordinaryBest, true), "book");
@@ -131,14 +131,28 @@ try {
     line(2, 14, cp(35), "h2h3", "h3"),
     line(3, 14, cp(28), "a2a4", "a4"),
   ];
-  assert.equal(classifyFromLines(GREEK, "a2a3", similar, false), "best");
+  assert.equal(classifyFromLines(GREEK, "a2a3", similar, false), undefined);
   assert.equal(assessBrilliant(GREEK, "a2a3", similar, { book: false }).brilliant, false);
 
-  // A move the searched lines never saw is not automatically a mistake.
-  assert.equal(classifyFromLines(START, "a2a3", ordinaryBest, false), "good");
-  // e4 and Nf3 are almost the same evaluation, so Nf3 is not a mistake.
-  const knight = classifyFromLines(START, "g1f3", ordinaryBest, false);
-  assert.ok(knight === "best" || knight === "excellent", knight);
+  // A move the searched lines never saw is not labeled until the next eval.
+  assert.equal(classifyFromLines(START, "a2a3", ordinaryBest, false), undefined);
+  // e4 and Nf3 are almost the same evaluation, so Nf3 gets no glyph.
+  assert.equal(classifyFromLines(START, "g1f3", ordinaryBest, false), undefined);
+
+  // Lichess Advice.scala: 0 to -1 is an inaccuracy, not a blunder.
+  assert.equal(
+    labelFromEvals({ book: false, before: cp(0), after: cp(-100), mover: "w" }),
+    "inaccuracy",
+  );
+  // Already losing: -6 to -9 barely changes the result.
+  assert.equal(
+    labelFromEvals({ book: false, before: cp(-600), after: cp(-900), mover: "w" }),
+    "inaccuracy",
+  );
+  assert.equal(
+    labelFromEvals({ book: false, before: cp(0), after: cp(-200), mover: "w" }),
+    "blunder",
+  );
 
   // Already winning: +8 to +5 is a few percent, not a blunder.
   const slip = labelFromEvals({

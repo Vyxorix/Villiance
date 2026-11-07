@@ -139,6 +139,9 @@ export function ReviewDialog() {
             Chess.com reported {reported.w.toFixed(1)} / {reported.b.toFixed(1)}
           </p>
         )}
+        <p className="mt-2 text-center text-xs text-subtle">
+          Inaccuracy, mistake, and blunder use Lichess winning chances. Other moves are left unmarked.
+        </p>
 
         <div className="mt-4 flex flex-col gap-1">
           {REVIEW_ORDER.map((key) => (

@@ -1,7 +1,7 @@
 import { Chess } from "chess.js";
 import { assessBrilliant, labelFromEvals } from "@/lib/chess/classify";
 import { getEngine } from "@/lib/chess/engine";
-import { evalToWhitePct, whiteScore } from "@/lib/chess/helpers";
+import { whiteScore } from "@/lib/chess/helpers";
 import { isBookMove } from "@/lib/chess/openings";
 import type { EngineLine, Ply, Score } from "@/lib/chess/types";
 import { useGame } from "@/store/game";
@@ -43,18 +43,7 @@ export async function runReview(force = false): Promise<void> {
     const sans = plies.slice(0, index + 1).map((p) => p.san);
     const book = isBookMove(sans);
     const best = prev.lines[0];
-    const second = prev.lines[1];
-    const verdict = prev.lines.length
-      ? assessBrilliant(prev.fen, ply.uci, prev.lines, { book: false })
-      : null;
-    const gap = best && second ? evalToWhitePct(best.score) - evalToWhitePct(second.score) : 0;
-    const great = Boolean(
-      best &&
-        ply.uci === best.pv[0] &&
-        second &&
-        gap >= 0.1 &&
-        evalToWhitePct(second.score) < 0.97,
-    );
+    const verdict = prev.lines.length ? assessBrilliant(prev.fen, ply.uci, prev.lines, { book: false }) : null;
     plies[index] = {
       ...ply,
       evalAfter: after,
@@ -64,9 +53,8 @@ export async function runReview(force = false): Promise<void> {
         after,
         mover: index % 2 === 0 ? "w" : "b",
         playedUci: ply.uci,
-        bestUci: prev.bestUci,
-        brilliant: Boolean(verdict?.brilliant) || ply.classification === "brilliant",
-        great: great || ply.classification === "great",
+        bestUci: best?.pv[0],
+        brilliant: Boolean(verdict?.brilliant),
       }),
     };
   };

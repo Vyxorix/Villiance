@@ -33,7 +33,7 @@ export function ReviewHome() {
         <div>
           <h2 className="font-display text-2xl leading-none">Review</h2>
           <p className="mt-2 text-sm leading-relaxed text-muted">
-            Paste a game, or look up a public Chess.com account. Villiance grades every move by the winning chance it gave away.
+            Paste a game, or look up a public Chess.com account. Moves are judged with Lichess winning chances: only a real drop is an inaccuracy, a mistake, or a blunder.
           </p>
         </div>
       </div>

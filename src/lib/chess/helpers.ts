@@ -1,4 +1,5 @@
 import { Chess, type Color, type PieceSymbol, type Square } from "chess.js";
+import { evalWinningChances } from "./lichess";
 import type { Score } from "./types";
 
 export const FILES = "abcdefgh";
@@ -96,13 +97,7 @@ export function formatScore(score: Score | null): string {
 
 export function evalToWhitePct(score: Score | null): number {
   if (!score) return 0.5;
-  if (score.type === "mate") {
-    if (score.value === 0) return 0.5;
-    return score.value > 0 ? 1 : 0;
-  }
-  // Lichess expected-score curve. +100cp ≈ 59%, +300cp ≈ 75%.
-  const p = 1 / (1 + Math.exp(-0.00368208 * score.value));
-  return Math.min(1, Math.max(0, p));
+  return (1 + evalWinningChances(score)) / 2;
 }
 
 export function pvToSan(fen: string, pv: string[]): string[] {
