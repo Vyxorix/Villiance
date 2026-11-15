@@ -4,3 +4,17 @@ node_modules/
 .env
 .env.*
 .vercel
+.node_modules.lock
+
+# Local scratch. The README pictures live in docs/screenshots.
+artifacts/
+attachments/
+screenshots/
+
+# Builder runtime, not part of the app.
+.grok/preview.log
+.grok/preview.pid
+.grok/status
+.grok/*.jpg
+.grok/banner*.jpg
+.grok/og-*.jpg
