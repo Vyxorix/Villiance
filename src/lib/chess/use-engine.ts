@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react";
+import { nullMoveFen, passerLossCp, threatMatters, threatMoveInfo } from "@/lib/chess/coach";
 import { needsDeeperCheck } from "@/lib/chess/classify";
 import { getEngine } from "@/lib/chess/engine";
 import { useGame } from "@/store/game";
@@ -36,7 +37,7 @@ export function useEngineBridge() {
     const stored = useGame.getState().cursor > 0
       ? (useGame.getState().plies[useGame.getState().cursor - 1]?.evalAfter ?? null)
       : null;
-    useGame.setState({ thinking: true, lines: [], brilliant: null, evalScore: stored });
+    useGame.setState({ thinking: true, lines: [], brilliant: null, threat: null, evalScore: stored });
     let playTimer: number | undefined;
     void (async () => {
       try {
@@ -69,6 +70,25 @@ export function useEngineBridge() {
           });
           if (id !== gen.current) return;
           useGame.getState().applyAnalysis(deeper, fen);
+        }
+        if (useGame.getState().mode === "analyze" && !useGame.getState().chess().isGameOver()) {
+          const passed = nullMoveFen(fen);
+          if (passed && id === gen.current) {
+            const threat = await engine.analyze(passed, {
+              movetime: Math.min(280, Math.max(160, movetime)),
+              multipv: 1,
+            });
+            if (id !== gen.current) return;
+            const uci = threat.lines[0]?.pv[0];
+            const info = uci ? threatMoveInfo(passed, uci) : null;
+            const score = threat.lines[0]?.score;
+            const loss = score ? passerLossCp(useGame.getState().evalScore, score, useGame.getState().turn()) : null;
+            if (uci && info && score && threatMatters({ capture: info.capture, check: info.check, lossForPasserCp: loss })) {
+              useGame.getState().setThreat(fen, { uci, san: info.san });
+            } else {
+              useGame.getState().setThreat(fen, null);
+            }
+          }
         }
       } catch (err) {
         if (id === gen.current) useGame.getState().setThinking(false);

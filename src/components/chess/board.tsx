@@ -70,6 +70,7 @@ export function ChessBoard() {
   const lastMove = useGame((s) => s.lastMove);
   const brilliant = useGame((s) => s.brilliant);
   const lines = useGame((s) => s.lines);
+  const threat = useGame((s) => s.threat);
   const mode = useGame((s) => s.mode);
   const studyMiss = useGame((s) => s.studyMiss);
   const studySolved = useGame((s) => s.studySolved);
@@ -135,17 +136,28 @@ export function ChessBoard() {
   }, [dragging, sqFromPoint]);
 
   const hints = showSuggestions({ mode, studyMiss, studySolved });
-  const arrowMoves: { from: Square; to: Square; kind: "best" | "brilliant" }[] = [];
-  if (hints && !dragging && brilliant) {
-    const p = uciParts(brilliant.uci);
-    arrowMoves.push({
-      from: p.from,
-      to: p.to,
-      kind: brilliant.brilliant ? "brilliant" : "best",
-    });
-  } else if (hints && !dragging && lines[0]?.pv[0]) {
-    const p = uciParts(lines[0].pv[0]);
-    arrowMoves.push({ from: p.from, to: p.to, kind: "best" });
+  const arrowMoves: { from: Square; to: Square; kind: "best" | "brilliant" | "alt" | "threat" }[] = [];
+  if (hints && !dragging) {
+    const bestUci = brilliant?.uci ?? lines[0]?.pv[0] ?? "";
+    if (mode === "analyze") {
+      for (const line of lines.slice(1, 3)) {
+        const uci = line.pv[0];
+        if (!uci || uci === bestUci) continue;
+        const p = uciParts(uci);
+        arrowMoves.push({ from: p.from, to: p.to, kind: "alt" });
+      }
+      if (threat && threat.uci !== bestUci) {
+        const p = uciParts(threat.uci);
+        arrowMoves.push({ from: p.from, to: p.to, kind: "threat" });
+      }
+    }
+    if (brilliant) {
+      const p = uciParts(brilliant.uci);
+      arrowMoves.push({ from: p.from, to: p.to, kind: brilliant.brilliant ? "brilliant" : "best" });
+    } else if (lines[0]?.pv[0]) {
+      const p = uciParts(lines[0].pv[0]);
+      arrowMoves.push({ from: p.from, to: p.to, kind: "best" });
+    }
   }
 
   const promoColor: Color = pending ? (chess.get(pending.from)?.color ?? turn) : turn;
@@ -236,19 +248,22 @@ export function ChessBoard() {
             const s = squareCenter(a.from, orientation);
             const t = squareCenter(a.to, orientation);
             const points = arrowPoints(s.x, s.y, t.x, t.y);
-            const brilliant = a.kind === "brilliant";
+            const paint =
+              a.kind === "brilliant"
+                ? "fill-brilliant stroke-arrow-edge"
+                : a.kind === "threat"
+                  ? "fill-threat stroke-arrow-edge"
+                  : a.kind === "alt"
+                    ? "fill-alt-arrow stroke-arrow-edge"
+                    : "fill-arrow stroke-arrow-edge";
             return (
               <polygon
-                key={`${a.from}${a.to}${a.kind}`}
+                key={`${a.kind}${a.from}${a.to}`}
                 points={points}
                 strokeWidth={0.006}
                 strokeLinejoin="round"
-                className={
-                  brilliant
-                    ? "fill-brilliant stroke-arrow-edge"
-                    : "fill-arrow stroke-arrow-edge"
-                }
-                opacity={0.92}
+                className={paint}
+                opacity={a.kind === "alt" ? 0.45 : a.kind === "threat" ? 0.78 : 0.92}
               />
             );
           })}

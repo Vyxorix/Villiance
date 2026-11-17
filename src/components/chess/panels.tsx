@@ -4,6 +4,7 @@ import {
   ChevronsLeft,
   ChevronsRight,
   ClipboardCopy,
+  ClipboardPaste,
   FlipVertical2,
   Lightbulb,
   RotateCcw,
@@ -23,6 +24,7 @@ import {
 } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Textarea } from "@/components/ui/textarea";
+import { coachSentence } from "@/lib/chess/coach";
 import { capturedPieces, formatScore, pieceSrc, statusText } from "@/lib/chess/helpers";
 import { STUDIES } from "@/lib/chess/studies";
 import { cn } from "@/lib/utils";
@@ -213,6 +215,70 @@ function MoveBtn({
         </span>
       )}
     </button>
+  );
+}
+
+export function CoachStrip() {
+  const mode = useGame((s) => s.mode);
+  const coach = useGame((s) => (s.cursor > 0 ? s.plies[s.cursor - 1]?.coach : undefined));
+  const lines = useGame((s) => s.lines);
+  const threat = useGame((s) => s.threat);
+  const thinking = useGame((s) => s.thinking);
+  const ready = useGame((s) => s.engineReady);
+  if (mode !== "analyze") return null;
+
+  const choices = lines.slice(0, 3).map((line) => line.san[0]).filter(Boolean);
+  const tone =
+    coach?.judgement === "blunder"
+      ? "text-blunder"
+      : coach?.judgement === "mistake"
+        ? "text-mistake"
+        : coach?.judgement === "inaccuracy"
+          ? "text-inacc"
+          : coach?.judgement === "book" || coach?.judgement === "best"
+            ? "text-brilliant"
+            : "text-fg";
+
+  return (
+    <div className="rounded-[var(--radius-lg)] border border-border bg-surface px-3 py-3">
+      {coach ? (
+        <p className={cn("text-sm leading-relaxed", tone)}>{coachSentence(coach)}</p>
+      ) : (
+        <p className="text-sm text-muted">
+          {ready ? "Play the move from the other board. Villiance will say what it wanted." : "Waking Stockfish…"}
+        </p>
+      )}
+      <div className="mt-2 flex flex-wrap items-baseline gap-x-3 gap-y-1">
+        <span className="text-[10px] font-medium tracking-wide text-subtle uppercase">Play</span>
+        {choices.length === 0 ? (
+          <span className="text-xs text-muted">{thinking ? "Looking…" : "—"}</span>
+        ) : (
+          choices.map((san, i) => (
+            <span key={`${san}${i}`} className={cn("font-mono text-xs", i === 0 ? "text-fg" : "text-alt-arrow")}>
+              {san}
+            </span>
+          ))
+        )}
+        {threat && <span className="font-mono text-xs text-threat">Threat {threat.san}</span>}
+      </div>
+      <Button
+        size="sm"
+        variant="outline"
+        className="mt-3"
+        onClick={() => {
+          void navigator.clipboard
+            .readText()
+            .then((text) => {
+              const msg = useGame.getState().applyClipboard(text, true);
+              toast(msg ?? "Clipboard is not a move or a position");
+            })
+            .catch(() => toast("Allow clipboard access, then try again"));
+        }}
+      >
+        <ClipboardPaste className="size-4" />
+        Paste move
+      </Button>
+    </div>
   );
 }
 

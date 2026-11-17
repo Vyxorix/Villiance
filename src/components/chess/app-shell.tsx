@@ -1,6 +1,6 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { Settings2 } from "lucide-react";
-import { Toaster } from "sonner";
+import { toast, Toaster } from "sonner";
 import { ChessBoard } from "@/components/chess/board";
 import { EvalBar } from "@/components/chess/eval-bar";
 import { HomeScreen, roomInk } from "@/components/chess/home";
@@ -13,6 +13,7 @@ import {
   MoveList,
   NewGameBar,
   StudiesPanel,
+  CoachStrip,
 } from "@/components/chess/panels";
 import { ReviewDialog } from "@/components/chess/review-dialog";
 import { Button } from "@/components/ui/button";
@@ -36,6 +37,64 @@ export function AppShell() {
   useEffect(() => {
     hydrate();
   }, [hydrate]);
+
+  useEffect(() => {
+    const hide = () => {
+      if (document.visibilityState === "hidden") useGame.getState().persistNow();
+    };
+    window.addEventListener("pagehide", hide);
+    document.addEventListener("visibilitychange", hide);
+    return () => {
+      window.removeEventListener("pagehide", hide);
+      document.removeEventListener("visibilitychange", hide);
+    };
+  }, []);
+
+  const seenClip = useRef("");
+  useEffect(() => {
+    const born = Date.now();
+    const pull = () => {
+      if (Date.now() - born < 800) return;
+      const s = useGame.getState();
+      if (s.screen !== "board" || s.mode !== "analyze" || s.reviewing || s.pendingPromotion) return;
+      const tag = (document.activeElement as HTMLElement | null)?.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA") return;
+      void navigator.clipboard
+        .readText()
+        .then((text) => {
+          const trimmed = text.trim();
+          if (!trimmed || trimmed === seenClip.current) return;
+          const msg = useGame.getState().applyClipboard(trimmed, false);
+          if (!msg) return;
+          seenClip.current = trimmed;
+          toast(msg);
+        })
+        .catch(() => undefined);
+    };
+    const onPaste = (e: ClipboardEvent) => {
+      const tag = (e.target as HTMLElement | null)?.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA") return;
+      const s = useGame.getState();
+      if (s.screen !== "board" || s.mode !== "analyze") return;
+      const text = e.clipboardData?.getData("text") ?? "";
+      if (!text.trim()) return;
+      const msg = s.applyClipboard(text, false);
+      if (!msg) return;
+      seenClip.current = text.trim();
+      toast(msg);
+    };
+    window.addEventListener("focus", pull);
+    const onShow = () => {
+      if (document.visibilityState === "visible") pull();
+    };
+    document.addEventListener("visibilitychange", onShow);
+    window.addEventListener("paste", onPaste);
+    return () => {
+      window.removeEventListener("focus", pull);
+      document.removeEventListener("visibilitychange", onShow);
+      window.removeEventListener("paste", onPaste);
+    };
+  }, []);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -105,6 +164,7 @@ export function AppShell() {
                 </div>
                 <CapturedRow />
                 <ChessBoard />
+                {mode === "analyze" && <CoachStrip />}
                 <ClassificationKey />
                 <GameToolbar />
                 <NewGameBar />

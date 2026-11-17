@@ -2,6 +2,7 @@ import { useMemo } from "react";
 import { Chess, DEFAULT_POSITION, type Square } from "chess.js";
 import { create } from "zustand";
 import { classifyFromLines, labelFromEvals, pickBrilliant } from "@/lib/chess/classify";
+import { coachFromLines, planClipboard, refineCoach, type ThreatArrow } from "@/lib/chess/coach";
 import type { AnalyzeResult } from "@/lib/chess/engine";
 import { kingSquare, statusText, toUci, uciParts } from "@/lib/chess/helpers";
 import { isBookMove, openingName } from "@/lib/chess/openings";
@@ -73,6 +74,8 @@ type GameState = {
   reviewProgress: number;
   reviewId: number;
   reportedAccuracy: { w: number; b: number } | null;
+  advice: { fen: string; lines: EngineLine[] } | null;
+  threat: ThreatArrow | null;
 };
 
 type GameActions = {
@@ -113,6 +116,8 @@ type GameActions = {
   startSuggest: () => void;
   startStudies: () => void;
   setReviewOpen: (open: boolean) => void;
+  setThreat: (fen: string, threat: ThreatArrow | null) => void;
+  applyClipboard: (text: string, replace: boolean) => string | null;
   canMove: (color: Color) => boolean;
   pgn: () => string;
 };
@@ -174,6 +179,8 @@ const initial: GameState = {
   reviewProgress: 0,
   reviewId: 0,
   reportedAccuracy: null,
+  advice: null,
+  threat: null,
 };
 
 export const useGame = create<GameState & GameActions>((set, get) => ({
@@ -210,6 +217,11 @@ export const useGame = create<GameState & GameActions>((set, get) => ({
           fenAfter: rebuilt.fen(),
         };
       });
+      const coaches = saved.coaches ?? [];
+      for (const savedCoach of coaches) {
+        const ply = plies[savedCoach.i];
+        if (ply && savedCoach.uci === ply.uci && savedCoach.note) ply.coach = savedCoach.note;
+      }
       const cursor = Math.min(saved.cursor, plies.length);
       set({
         startFen,
@@ -229,6 +241,9 @@ export const useGame = create<GameState & GameActions>((set, get) => ({
         opening: openingName(plies.slice(0, cursor).map((p) => p.san)),
         selected: null,
         dests: [],
+        screen: saved.screen === "board" ? "board" : "home",
+        advice: null,
+        threat: null,
       });
     } catch {
       set({ movetime: saved.movetime, sound: saved.sound, showCoords: saved.showCoords, boardTheme: saved.boardTheme, room: saved.room, customBg: saved.customBg });
@@ -252,6 +267,8 @@ export const useGame = create<GameState & GameActions>((set, get) => ({
       boardTheme: s.boardTheme,
       room: s.room,
       customBg: s.customBg,
+      screen: s.screen === "board" || (s.screen === "settings" && s.settingsBack === "board") ? "board" : "home",
+      coaches: s.plies.flatMap((ply, i) => (ply.coach ? [{ i, uci: ply.uci, note: ply.coach }] : [])),
     });
   },
 
@@ -302,6 +319,8 @@ export const useGame = create<GameState & GameActions>((set, get) => ({
       reviewProgress: 0,
       reviewId: get().reviewId + 1,
       reportedAccuracy: null,
+      advice: null,
+      threat: null,
     });
     get().persistNow();
   },
@@ -341,6 +360,8 @@ export const useGame = create<GameState & GameActions>((set, get) => ({
         reviewProgress: 0,
         reviewId: get().reviewId + 1,
         reportedAccuracy: null,
+        advice: null,
+        threat: null,
       });
       get().persistNow();
       return null;
@@ -369,6 +390,8 @@ export const useGame = create<GameState & GameActions>((set, get) => ({
         reviewProgress: 0,
         reviewId: get().reviewId + 1,
         reportedAccuracy: null,
+        advice: null,
+        threat: null,
       });
       get().persistNow();
       return null;
@@ -454,11 +477,11 @@ export const useGame = create<GameState & GameActions>((set, get) => ({
       fenAfter: chess.fen(),
     };
     const sans = [...s.plies.slice(0, s.cursor).map((p) => p.san), ply.san];
-    if (s.lines.length) {
-      ply.classification = classifyFromLines(beforeFen, ply.uci, s.lines, isBookMove(sans));
-    } else if (isBookMove(sans)) {
-      ply.classification = "book";
-    }
+    const known = s.advice?.fen === beforeFen ? s.advice.lines : [];
+    const book = isBookMove(sans);
+    if (known.length) ply.classification = classifyFromLines(beforeFen, ply.uci, known, book);
+    else if (book) ply.classification = "book";
+    if (s.mode === "analyze") ply.coach = coachFromLines(ply.san, ply.uci, known, book);
 
     let studySolved = s.studySolved;
     let studyMiss = s.studyMiss;
@@ -565,7 +588,10 @@ export const useGame = create<GameState & GameActions>((set, get) => ({
   setImportOpen: (importOpen) => set({ importOpen }),
   setHoverDest: (hoverDest) => set({ hoverDest }),
   setDragging: (dragging) => set({ dragging }),
-  setScreen: (screen) => set({ screen }),
+  setScreen: (screen) => {
+    set({ screen });
+    if (screen === "home" || screen === "board") get().persistNow();
+  },
   openSettings: () => {
     const from = get().screen === "board" ? "board" : "home";
     set({ screen: "settings", settingsBack: from });
@@ -614,6 +640,7 @@ export const useGame = create<GameState & GameActions>((set, get) => ({
     if (idx >= 0 && plies[idx] && evalScore) {
       const before = idx === 0 ? get().startEval : plies[idx - 1]?.evalAfter;
       const existing = plies[idx].classification;
+      const mover = idx % 2 === 0 ? "w" : "b";
       plies[idx] = {
         ...plies[idx],
         evalAfter: evalScore,
@@ -623,11 +650,12 @@ export const useGame = create<GameState & GameActions>((set, get) => ({
                 book: false,
                 before,
                 after: evalScore,
-                mover: idx % 2 === 0 ? "w" : "b",
+                mover,
                 brilliant: existing === "brilliant",
                 great: existing === "great",
               })
             : existing,
+        coach: plies[idx].coach ? refineCoach(plies[idx].coach, before ?? null, evalScore, mover) : plies[idx].coach,
       };
     }
     set({
@@ -636,8 +664,54 @@ export const useGame = create<GameState & GameActions>((set, get) => ({
       brilliant,
       thinking: false,
       plies,
+      advice: lines[0] ? { fen, lines } : null,
       startEval: idx < 0 && evalScore ? evalScore : get().startEval,
     });
+    if (idx >= 0 && plies[idx]?.coach) get().persistNow();
+  },
+
+  setThreat: (fen, threat) => {
+    if (get().fen() !== fen || get().mode !== "analyze") return;
+    set({ threat });
+  },
+
+  applyClipboard: (text, replace) => {
+    const s = get();
+    if (s.mode !== "analyze" || s.pendingPromotion || s.reviewing) return null;
+    const plan = planClipboard(
+      text,
+      {
+        fen: s.fen(),
+        startFen: s.startFen,
+        plies: s.plies.map((ply) => ({ san: ply.san, uci: ply.uci })),
+        cursor: s.cursor,
+      },
+      replace,
+    );
+    if (plan.type === "ignore") return null;
+    if (plan.type === "already") return "Already on the board";
+    if (plan.type === "fen") {
+      const err = get().loadFen(plan.fen);
+      if (err) return null;
+      set({ orientation: new Chess(plan.fen).turn() });
+      return "Loaded position";
+    }
+    if (plan.type === "reset") {
+      get().newGame({ color: "w", mode: "analyze", fen: plan.fen });
+      set({ screen: "board", orientation: new Chess(plan.fen).turn() === "b" ? "b" : "w" });
+    } else if (plan.goto !== null) {
+      get().goto(plan.goto);
+    }
+    let played = 0;
+    let last = "";
+    for (const move of plan.moves) {
+      const ok = get().tryMove(move.from, move.to, move.promotion);
+      if (!ok) break;
+      played += 1;
+      last = move.san;
+    }
+    if (!played) return plan.type === "reset" ? "Loaded position" : null;
+    return played === 1 ? `Played ${last}` : `Played ${played} moves`;
   },
 }));
 

@@ -10,7 +10,7 @@ Play it at [villiance.vercel.app](https://villiance.vercel.app).
 
 **Vs engine.** You move. Villiance answers. Suggestion arrows stay off.
 
-**Suggest only.** You are playing someone somewhere else and copying the moves here. Villiance recommends a reply and never moves a piece for you.
+**Suggest only.** You are playing someone somewhere else and copying the moves here. Villiance recommends a reply and never moves a piece for you. After each move it says what the engine wanted and what it cost. Two quieter arrows are the next choices, and an orange arrow is the threat if you do nothing. Paste a move, a game, or a position, or copy one and come back to the app.
 
 **Review.** Paste moves, or look up a public Chess.com username. Villiance walks the game, draws the evaluation, and marks only the moves that actually dropped.
 

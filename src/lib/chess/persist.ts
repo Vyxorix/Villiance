@@ -1,6 +1,9 @@
 import { isBoardTheme, isRoom, type BoardThemeId, type RoomId } from "./appearance";
+import type { CoachNote } from "./types";
 
 const KEY = "brilliance.v1";
+
+export type PersistedCoach = { i: number; uci: string; note: CoachNote };
 
 export type Persisted = {
   version: 2;
@@ -17,6 +20,8 @@ export type Persisted = {
   boardTheme: BoardThemeId;
   room: RoomId;
   customBg: string;
+  screen: "home" | "board";
+  coaches: PersistedCoach[];
 };
 
 export const persistDefaults: Persisted = {
@@ -34,6 +39,8 @@ export const persistDefaults: Persisted = {
   boardTheme: "sage",
   room: "ink",
   customBg: "#1a1c28",
+  screen: "home",
+  coaches: [],
 };
 
 export function loadPersist(): Persisted {
@@ -47,6 +54,8 @@ export function loadPersist(): Persisted {
     if (!isBoardTheme(merged.boardTheme)) merged.boardTheme = "sage";
     if (!isRoom(merged.room)) merged.room = "ink";
     if (!/^#[0-9a-fA-F]{6}$/.test(merged.customBg)) merged.customBg = persistDefaults.customBg;
+    if (merged.screen !== "board" && merged.screen !== "home") merged.screen = "home";
+    if (!Array.isArray(merged.coaches)) merged.coaches = [];
     return merged;
   } catch {
     return persistDefaults;

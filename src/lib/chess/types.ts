@@ -25,6 +25,18 @@ export type EngineLine = {
   san: string[];
 };
 
+export type CoachJudgement = "book" | "best" | "inaccuracy" | "mistake" | "blunder" | "miss";
+
+export type CoachNote = {
+  playedSan: string;
+  playedUci: string;
+  bestSan: string;
+  bestUci: string;
+  /** Centipawns the mover gave away. Positive is worse. Null when it isn't a pawn score. */
+  lossCp: number | null;
+  judgement: CoachJudgement | null;
+};
+
 export type Ply = {
   san: string;
   from: Square;
@@ -34,6 +46,7 @@ export type Ply = {
   fenAfter: string;
   classification?: Classification;
   evalAfter?: Score;
+  coach?: CoachNote;
 };
 
 export type BrilliantHint = {
