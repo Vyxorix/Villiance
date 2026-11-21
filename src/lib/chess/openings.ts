@@ -49,3 +49,57 @@ export function isBookMove(sans: string[]): boolean {
   if (!chess) return false;
   return book[positionKey(chess)] !== undefined;
 }
+
+export function bookMoves(sans: string[]): string[] {
+  const chess = sans.length === 0 ? new Chess() : playLine(sans);
+  if (!chess) return [];
+  const out: string[] = [];
+  for (const move of chess.moves({ verbose: true })) {
+    const next = new Chess(chess.fen());
+    next.move(move);
+    if (book[positionKey(next)] !== undefined) out.push(move.san);
+  }
+  return out;
+}
+
+const BOOK_PREFER = ["e4", "d4", "Nf3", "c4", "e5", "c5", "Nc6", "Nf6", "d5", "e6", "c6", "g6", "Bb5", "Bc4", "Be7", "O-O"];
+
+/** A book reply for the engine, or null once the position has left theory. */
+export function pickBookReply(sans: string[], engineSan: string | null): string | null {
+  if (sans.length >= 16) return null;
+  const choices = bookMoves(sans);
+  if (choices.length === 0) return null;
+  if (engineSan && choices.includes(engineSan)) return engineSan;
+  return BOOK_PREFER.find((san) => choices.includes(san)) ?? choices[0] ?? null;
+}
+
+export type OpeningReport = {
+  name: string | null;
+  leftIndex: number | null;
+  leftSan: string | null;
+  wanted: string[];
+};
+
+/** Where the game left the book, and which book moves were still available. */
+export function openingReport(sans: string[]): OpeningReport {
+  let lastBook = -1;
+  for (let i = 0; i < sans.length; i++) {
+    if (!isBookMove(sans.slice(0, i + 1))) break;
+    lastBook = i;
+  }
+  const name = openingName(lastBook >= 0 ? sans.slice(0, lastBook + 1) : []);
+  if (sans.length === 0 || lastBook === sans.length - 1) {
+    return { name, leftIndex: null, leftSan: null, wanted: [] };
+  }
+  const leftIndex = lastBook + 1;
+  return {
+    name,
+    leftIndex,
+    leftSan: sans[leftIndex] ?? null,
+    wanted: [...bookMoves(sans.slice(0, leftIndex))].sort((a, b) => {
+      const ia = BOOK_PREFER.indexOf(a);
+      const ib = BOOK_PREFER.indexOf(b);
+      return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib);
+    }).slice(0, 4),
+  };
+}

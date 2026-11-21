@@ -47,6 +47,8 @@ export type Ply = {
   classification?: Classification;
   evalAfter?: Score;
   coach?: CoachNote;
+  /** The engine line from the position before this move, when it was not the move played. */
+  better?: { uci: string; san: string; pvSan: string[] };
 };
 
 export type BrilliantHint = {

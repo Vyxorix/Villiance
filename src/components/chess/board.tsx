@@ -65,12 +65,14 @@ function squareCenter(sq: Square, orientation: Color) {
 
 export function ChessBoard() {
   const orientation = useGame((s) => s.orientation);
+  const cursor = useGame((s) => s.cursor);
   const selected = useGame((s) => s.selected);
   const dests = useGame((s) => s.dests);
   const lastMove = useGame((s) => s.lastMove);
   const brilliant = useGame((s) => s.brilliant);
   const lines = useGame((s) => s.lines);
   const threat = useGame((s) => s.threat);
+  const lineHint = useGame((s) => s.lineHint);
   const mode = useGame((s) => s.mode);
   const studyMiss = useGame((s) => s.studyMiss);
   const studySolved = useGame((s) => s.studySolved);
@@ -156,6 +158,12 @@ export function ChessBoard() {
       arrowMoves.push({ from: p.from, to: p.to, kind: brilliant.brilliant ? "brilliant" : "best" });
     } else if (lines[0]?.pv[0]) {
       const p = uciParts(lines[0].pv[0]);
+      arrowMoves.push({ from: p.from, to: p.to, kind: "best" });
+    }
+  }
+  if (lineHint && lineHint.at === cursor && !dragging) {
+    const p = uciParts(lineHint.uci);
+    if (!arrowMoves.some((a) => a.from === p.from && a.to === p.to)) {
       arrowMoves.push({ from: p.from, to: p.to, kind: "best" });
     }
   }

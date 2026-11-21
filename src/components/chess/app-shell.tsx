@@ -14,6 +14,7 @@ import {
   NewGameBar,
   StudiesPanel,
   CoachStrip,
+  LineHintBar,
 } from "@/components/chess/panels";
 import { ReviewDialog } from "@/components/chess/review-dialog";
 import { Button } from "@/components/ui/button";
@@ -164,6 +165,7 @@ export function AppShell() {
                 </div>
                 <CapturedRow />
                 <ChessBoard />
+                <LineHintBar />
                 {mode === "analyze" && <CoachStrip />}
                 <ClassificationKey />
                 <GameToolbar />

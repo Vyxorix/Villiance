@@ -1,10 +1,15 @@
 import { REVIEW_ORDER, reviewComplete, summarizeReview } from "@/lib/chess/review";
 import { runReview } from "@/lib/chess/run-review";
-import type { Classification, GameMode, Color } from "@/lib/chess/types";
+import { annotatedPgn } from "@/lib/chess/annotated";
+import { openingReport } from "@/lib/chess/openings";
+import { formatScore } from "@/lib/chess/helpers";
+import { sharePositionCard } from "@/lib/chess/share-card";
+import type { Classification, GameMode, Color, Ply } from "@/lib/chess/types";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import { useGame } from "@/store/game";
+import { toast } from "sonner";
 
 const LABEL: Record<Classification, string> = {
   brilliant: "Brilliant",
@@ -55,6 +60,12 @@ function fmt(n: number | null): string {
 function moveName(index: number, san: string): string {
   const n = Math.floor(index / 2) + 1;
   return index % 2 === 0 ? `${n}. ${san}` : `${n}… ${san}`;
+}
+
+function wantedOf(ply: Ply): string | null {
+  if (ply.better?.san && ply.better.san !== ply.san) return ply.better.san;
+  if (ply.coach?.bestSan && ply.coach.bestUci !== ply.uci) return ply.coach.bestSan;
+  return null;
 }
 
 function EvalGraph({
@@ -110,6 +121,7 @@ export function ReviewDialog() {
   const review = summarizeReview(plies, startEval);
   const names = sideNames(mode, playerColor);
   const done = reviewComplete(plies, startEval);
+  const report = openingReport(plies.map((p) => p.san));
   const moments = plies.flatMap((ply, i) =>
     ply.classification && NOTABLE.has(ply.classification) ? [{ i, ply }] : [],
   );
@@ -142,6 +154,21 @@ export function ReviewDialog() {
         <p className="mt-2 text-center text-xs text-subtle">
           Inaccuracy, mistake, and blunder use Lichess winning chances. Other moves are left unmarked.
         </p>
+
+        {plies.length > 0 && (
+          <div className="mt-4 rounded-[var(--radius-md)] border border-border bg-surface px-3 py-3">
+            <p className="text-[11px] font-medium tracking-wide text-subtle uppercase">Opening</p>
+            <p className="mt-1 text-sm">{report.name ?? opening ?? "No book name"}</p>
+            {report.leftSan ? (
+              <p className="mt-1 text-sm text-muted">
+                Left the book with {moveName(report.leftIndex ?? 0, report.leftSan)}
+                {report.wanted.length > 0 ? `. The book still had ${report.wanted.join(", ")}.` : "."}
+              </p>
+            ) : (
+              <p className="mt-1 text-sm text-muted">Still in the book.</p>
+            )}
+          </div>
+        )}
 
         <div className="mt-4 flex flex-col gap-1">
           {REVIEW_ORDER.map((key) => (
@@ -182,11 +209,16 @@ export function ReviewDialog() {
                 <li key={`${ply.uci}-${i}`}>
                   <button
                     type="button"
-                    onClick={() => jump(i + 1)}
-                    className="flex h-11 w-full items-center justify-between rounded-[var(--radius-sm)] px-2 text-left hover:bg-surface-2"
+                    onClick={() => useGame.getState().revealLine(i)}
+                    className="flex h-11 w-full items-center justify-between gap-3 rounded-[var(--radius-sm)] px-2 text-left hover:bg-surface-2"
                   >
-                    <span className="font-mono text-sm">{moveName(i, ply.san)}</span>
-                    <span className={cn("font-mono text-xs", ply.classification && TONE[ply.classification])}>
+                    <span className="min-w-0">
+                      <span className="block font-mono text-sm">{moveName(i, ply.san)}</span>
+                      {wantedOf(ply) && (
+                        <span className="block truncate text-xs text-muted">Wanted {wantedOf(ply)}</span>
+                      )}
+                    </span>
+                    <span className={cn("shrink-0 font-mono text-xs", ply.classification && TONE[ply.classification])}>
                       {ply.classification ? LABEL[ply.classification] : ""}
                       {ply.classification && MARK[ply.classification] ? ` ${MARK[ply.classification]}` : ""}
                     </span>
@@ -194,6 +226,38 @@ export function ReviewDialog() {
                 </li>
               ))}
             </ul>
+          </div>
+        )}
+        {plies.length > 0 && (
+          <div className="mt-3 grid grid-cols-2 gap-2">
+            <Button
+              variant="outline"
+              onClick={async () => {
+                const s = useGame.getState();
+                const text = annotatedPgn(s.startFen, s.plies);
+                await navigator.clipboard.writeText(text);
+                toast("Annotated PGN copied");
+              }}
+            >
+              Copy PGN
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => {
+                const s = useGame.getState();
+                const ply = s.cursor > 0 ? s.plies[s.cursor - 1] : undefined;
+                const mark = ply?.classification ? LABEL[ply.classification] : "Position";
+                const evalText = formatScore(ply?.evalAfter ?? s.evalScore);
+                void sharePositionCard({
+                  fen: s.fen(),
+                  orientation: s.orientation,
+                  title: ply ? `${moveName(s.cursor - 1, ply.san)} · ${mark}` : "Starting position",
+                  caption: `Eval ${evalText}`,
+                }).catch(() => toast("Could not share that position"));
+              }}
+            >
+              Share position
+            </Button>
           </div>
         )}
       </DialogContent>

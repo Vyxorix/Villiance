@@ -22,6 +22,8 @@ import type {
   Square as Sq,
 } from "@/lib/chess/types";
 
+export type LineHint = { at: number; uci: string; san: string; pvSan: string[] };
+
 export type PendingPromotion = { from: Sq; to: Sq };
 
 export type Screen = "home" | "settings" | "board";
@@ -76,6 +78,7 @@ type GameState = {
   reportedAccuracy: { w: number; b: number } | null;
   advice: { fen: string; lines: EngineLine[] } | null;
   threat: ThreatArrow | null;
+  lineHint: LineHint | null;
 };
 
 type GameActions = {
@@ -118,6 +121,7 @@ type GameActions = {
   setReviewOpen: (open: boolean) => void;
   setThreat: (fen: string, threat: ThreatArrow | null) => void;
   applyClipboard: (text: string, replace: boolean) => string | null;
+  revealLine: (plyIndex: number) => void;
   canMove: (color: Color) => boolean;
   pgn: () => string;
 };
@@ -181,6 +185,7 @@ const initial: GameState = {
   reportedAccuracy: null,
   advice: null,
   threat: null,
+  lineHint: null,
 };
 
 export const useGame = create<GameState & GameActions>((set, get) => ({
@@ -547,6 +552,7 @@ export const useGame = create<GameState & GameActions>((set, get) => ({
       dests: [],
       lastMove: lastFromPlies(s.plies, next),
       pendingPromotion: null,
+      lineHint: null,
     });
     get().persistNow();
   },
@@ -712,6 +718,20 @@ export const useGame = create<GameState & GameActions>((set, get) => ({
     }
     if (!played) return plan.type === "reset" ? "Loaded position" : null;
     return played === 1 ? `Played ${last}` : `Played ${played} moves`;
+  },
+
+  revealLine: (plyIndex) => {
+    const ply = get().plies[plyIndex];
+    get().goto(plyIndex);
+    const fromCoach =
+      ply?.coach && ply.coach.bestUci && ply.coach.bestUci !== ply.uci
+        ? { uci: ply.coach.bestUci, san: ply.coach.bestSan, pvSan: [ply.coach.bestSan] }
+        : null;
+    const better = ply?.better ?? fromCoach;
+    set({
+      reviewOpen: false,
+      lineHint: better ? { at: plyIndex, uci: better.uci, san: better.san, pvSan: better.pvSan } : null,
+    });
   },
 }));
 

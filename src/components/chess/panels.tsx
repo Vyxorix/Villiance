@@ -218,6 +218,22 @@ function MoveBtn({
   );
 }
 
+export function LineHintBar() {
+  const hint = useGame((s) => s.lineHint);
+  const cursor = useGame((s) => s.cursor);
+  if (!hint || hint.at !== cursor) return null;
+  return (
+    <div className="rounded-[var(--radius-lg)] border border-border bg-surface px-3 py-3">
+      <p className="text-sm">
+        Play <span className="font-mono">{hint.san}</span> instead.
+      </p>
+      {hint.pvSan.length > 0 && (
+        <p className="mt-1 font-mono text-xs leading-relaxed text-muted">{hint.pvSan.join(" ")}</p>
+      )}
+    </div>
+  );
+}
+
 export function CoachStrip() {
   const mode = useGame((s) => s.mode);
   const coach = useGame((s) => (s.cursor > 0 ? s.plies[s.cursor - 1]?.coach : undefined));

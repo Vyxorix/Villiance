@@ -1,6 +1,7 @@
 import { ClipboardPaste } from "lucide-react";
 import { useState } from "react";
 import { loadChessComGames, type ChessComGame } from "@/lib/chess/chesscom";
+import { loadLichessGames } from "@/lib/chess/lichess-games";
 import { runReview } from "@/lib/chess/run-review";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -23,6 +24,10 @@ export function ReviewHome() {
   const [pending, setPending] = useState(false);
   const [games, setGames] = useState<ChessComGame[]>([]);
   const [found, setFound] = useState<string | null>(null);
+  const [liName, setLiName] = useState("");
+  const [liError, setLiError] = useState<string | null>(null);
+  const [liPending, setLiPending] = useState(false);
+  const [liGames, setLiGames] = useState<ChessComGame[]>([]);
 
   return (
     <section className="rounded-[var(--radius-lg)] border border-border bg-surface p-4 sm:p-5">
@@ -33,7 +38,7 @@ export function ReviewHome() {
         <div>
           <h2 className="font-display text-2xl leading-none">Review</h2>
           <p className="mt-2 text-sm leading-relaxed text-muted">
-            Paste a game, or look up a public Chess.com account. Moves are judged with Lichess winning chances: only a real drop is an inaccuracy, a mistake, or a blunder.
+            Paste a game, or look up a public Chess.com or Lichess account. Moves are judged with Lichess winning chances.
           </p>
         </div>
       </div>
@@ -116,6 +121,72 @@ export function ReviewHome() {
                     <span className="mt-0.5 block text-xs text-muted">
                       {game.timeClass} · {game.whiteRating}–{game.blackRating}
                       {game.accuracy ? ` · Chess.com ${game.accuracy.w.toFixed(0)} / ${game.accuracy.b.toFixed(0)}` : ""}
+                    </span>
+                  </span>
+                  <span className="shrink-0 font-mono text-xs text-muted">{game.result}</span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+
+      <div className="mt-5 border-t border-border pt-4">
+        <p className="text-xs font-medium tracking-wide text-subtle uppercase">Lichess</p>
+        <form
+          className="mt-2 flex gap-2"
+          onSubmit={(e) => {
+            e.preventDefault();
+            const name = liName.trim();
+            if (!name || liPending) return;
+            setLiPending(true);
+            setLiError(null);
+            void loadLichessGames({ data: { username: name } })
+              .then((result) => {
+                if (!result.ok) {
+                  setLiGames([]);
+                  setLiError(result.error);
+                  return;
+                }
+                setLiGames(result.games);
+                if (result.games.length === 0) setLiError("No standard games found.");
+              })
+              .catch(() => setLiError("Could not reach Lichess."))
+              .finally(() => setLiPending(false));
+          }}
+        >
+          <Input
+            value={liName}
+            onChange={(e) => setLiName(e.target.value)}
+            placeholder="Username"
+            aria-label="Lichess username"
+            autoCapitalize="none"
+            autoCorrect="off"
+            spellCheck={false}
+          />
+          <Button type="submit" variant="secondary" disabled={liPending || liName.trim().length < 2}>
+            {liPending ? "Looking…" : "Find"}
+          </Button>
+        </form>
+        {liError && <p className="mt-2 text-sm text-blunder">{liError}</p>}
+        {liGames.length > 0 && (
+          <ul className="mt-3 flex flex-col gap-1.5">
+            {liGames.map((game) => (
+              <li key={game.id}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const message = openPgn(game.pgn, null);
+                    setPasteError(message);
+                  }}
+                  className="flex w-full items-center justify-between gap-3 rounded-[var(--radius-md)] border border-border px-3 py-2.5 text-left hover:bg-surface-2"
+                >
+                  <span className="min-w-0">
+                    <span className="block truncate text-sm font-medium">
+                      {game.white} – {game.black}
+                    </span>
+                    <span className="mt-0.5 block text-xs text-muted">
+                      {game.timeClass} · {game.whiteRating}–{game.blackRating}
                     </span>
                   </span>
                   <span className="shrink-0 font-mono text-xs text-muted">{game.result}</span>

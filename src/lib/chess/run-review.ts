@@ -43,6 +43,11 @@ export async function runReview(force = false): Promise<void> {
     const sans = plies.slice(0, index + 1).map((p) => p.san);
     const book = isBookMove(sans);
     const best = prev.lines[0];
+    const bestUci = best?.pv[0] ?? "";
+    const better =
+      bestUci && bestUci !== ply.uci
+        ? { uci: bestUci, san: best.san[0] || bestUci, pvSan: best.san.slice(0, 8) }
+        : undefined;
     const verdict = prev.lines.length ? assessBrilliant(prev.fen, ply.uci, prev.lines, { book: false }) : null;
     plies[index] = {
       ...ply,
@@ -56,6 +61,7 @@ export async function runReview(force = false): Promise<void> {
         bestUci: best?.pv[0],
         brilliant: Boolean(verdict?.brilliant),
       }),
+      better: prev.lines.length ? better : ply.better,
     };
   };
 
