@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { PieceSymbol, Square } from "chess.js";
 import { FILES, kingSquare, pieceSrc, uciParts } from "@/lib/chess/helpers";
+import { placePieces, squarePercent, type Placed } from "@/lib/chess/motion";
 import { cn } from "@/lib/utils";
 import { useGame, usePosition, showSuggestions } from "@/store/game";
 import type { Color, PromotionPiece } from "@/lib/chess/types";
@@ -82,6 +83,22 @@ export function ChessBoard() {
   const dragging = useGame((s) => s.dragging);
   const hoverDest = useGame((s) => s.hoverDest);
   const chess = usePosition();
+  const fen = chess.fen();
+  const chessRef = useRef(chess);
+  chessRef.current = chess;
+  const [placed, setPlaced] = useState<Placed[]>(() => placePieces([], chess, null));
+  const placedReady = useRef(false);
+  const orientRef = useRef(orientation);
+  const slide = orientRef.current === orientation;
+  if (orientRef.current !== orientation) orientRef.current = orientation;
+
+  useEffect(() => {
+    if (!placedReady.current) {
+      placedReady.current = true;
+      return;
+    }
+    setPlaced((prev) => placePieces(prev, chessRef.current, lastMove));
+  }, [fen, lastMove]);
   const boardRef = useRef<HTMLDivElement>(null);
   const [ghost, setGhost] = useState<{ x: number; y: number; src: string } | null>(null);
 
@@ -239,15 +256,23 @@ export function ChessBoard() {
                 {isDest && piece && (
                   <span className="absolute inset-[6%] z-10 rounded-full border-[3px] border-accent-fg/35" />
                 )}
-                {piece && dragging !== sq && (
-                  <img
-                    src={pieceSrc(piece.color, piece.type)}
-                    alt=""
-                    draggable={false}
-                    className="relative z-10 h-[86%] w-[86%] object-contain"
-                  />
-                )}
               </button>
+            );
+          })}
+        </div>
+
+        <div className="pointer-events-none absolute inset-0 z-10">
+          {placed.map((piece) => {
+            const at = squarePercent(piece.sq, orientation);
+            return (
+              <img
+                key={piece.id}
+                src={pieceSrc(piece.color, piece.type)}
+                alt=""
+                draggable={false}
+                className={cn("absolute size-[12.5%] object-contain p-[3.5%]", slide && "transition-[left,top] duration-200 ease-out")}
+                style={{ ...at, opacity: dragging === piece.sq ? 0 : 1 }}
+              />
             );
           })}
         </div>

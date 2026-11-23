@@ -16,7 +16,7 @@ Play it at [villiance.vercel.app](https://villiance.vercel.app).
 
 **Studies.** Forcing patterns, plus any opening in the book. You pick a color and play that side. The other side answers from the line. A move that leaves the book is refused, and the book move is shown.
 
-You can step backward and forward through the moves, flip the board, import a PGN or FEN, and copy the game back out.
+You can step backward and forward through the moves, flip the board, import a PGN or FEN, and copy the game back out. Pieces slide to their square instead of jumping.
 
 <p>
   <img src="docs/screenshots/suggest.png" alt="Suggest only, with an evaluation bar and a recommended arrow on the Italian Game" width="49%" />
