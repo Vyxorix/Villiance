@@ -15,6 +15,7 @@ export function useEngineBridge() {
   const screen = useGame((s) => s.screen);
   const reviewing = useGame((s) => s.reviewing);
   const strength = useGame((s) => s.strength);
+  const training = useGame((s) => Boolean(s.train && !s.train.done));
   const playerColor = useGame((s) => s.playerColor);
   const plyCount = useGame((s) => s.plies.length);
   const fen = plyFen ?? startFen;
@@ -33,7 +34,7 @@ export function useEngineBridge() {
       useGame.setState({ thinking: false, lines: [], brilliant: null });
       return;
     }
-    if (reviewing) return;
+    if (reviewing || training) return;
     const id = ++gen.current;
     const engine = getEngine();
     const stored = useGame.getState().cursor > 0
@@ -132,5 +133,5 @@ export function useEngineBridge() {
       if (useGame.getState().reviewing) return;
       engine.stop();
     };
-  }, [fen, engineOn, movetime, mode, playerColor, plyCount, cursor, screen, reviewing, strength]);
+  }, [fen, engineOn, movetime, mode, playerColor, plyCount, cursor, screen, reviewing, strength, training]);
 }

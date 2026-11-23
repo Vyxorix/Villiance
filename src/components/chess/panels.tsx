@@ -11,7 +11,7 @@ import {
   Volume2,
   VolumeX,
 } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -27,10 +27,11 @@ import { Textarea } from "@/components/ui/textarea";
 import { coachSentence } from "@/lib/chess/coach";
 import { capturedPieces, formatScore, pieceSrc, statusText } from "@/lib/chess/helpers";
 import { formatClock, outcomeFromChess } from "@/lib/chess/play";
-import { STUDIES } from "@/lib/chess/studies";
+import { openingCatalog, type OpeningLine } from "@/lib/chess/openings";
 import { cn } from "@/lib/utils";
 import { showSuggestions, useGame, usePosition } from "@/store/game";
-import type { Classification } from "@/lib/chess/types";
+import { STUDIES } from "@/lib/chess/studies";
+import type { Classification, Color } from "@/lib/chess/types";
 
 const CLASS_LABEL: Record<Classification, string> = {
   brilliant: "Brilliant",
@@ -368,10 +369,11 @@ export function EnginePanel() {
   const mode = useGame((s) => s.mode);
   const studyMiss = useGame((s) => s.studyMiss);
   const studySolved = useGame((s) => s.studySolved);
+  const trainLive = useGame((s) => Boolean(s.train && !s.train.done));
   const chess = usePosition();
   const status = statusText(chess);
   const turn = chess.turn();
-  const hints = showSuggestions({ mode, studyMiss, studySolved });
+  const hints = showSuggestions({ mode, studyMiss, studySolved, trainLive });
   const playerColor = useGame((s) => s.playerColor);
   const engineTurn = mode === "play" && turn !== playerColor && !chess.isGameOver();
 
@@ -447,44 +449,139 @@ export function EnginePanel() {
   );
 }
 
+const FEATURED = [
+  "Italian Game",
+  "Ruy Lopez",
+  "Sicilian Defense",
+  "French Defense",
+  "Caro-Kann Defense",
+  "Caro-Kann Defense: Alien Gambit",
+  "Queen's Gambit Declined",
+  "King's Indian Defense",
+  "English Opening",
+  "London System",
+  "Scotch Game",
+  "Vienna Game",
+  "Italian Game: Two Knights Defense, Fried Liver Attack",
+  "Sicilian Defense: Najdorf Variation",
+];
+
 export function StudiesPanel() {
   const studyId = useGame((s) => s.studyId);
   const solved = useGame((s) => s.studySolved);
   const miss = useGame((s) => s.studyMiss);
+  const train = useGame((s) => s.train);
+  const cursor = useGame((s) => s.cursor);
+  const atEnd = useGame((s) => s.cursor === s.plies.length);
   const active = STUDIES.find((s) => s.id === studyId);
+  const [query, setQuery] = useState("");
+  const [color, setColor] = useState<Color>("w");
+  const [lines, setLines] = useState<OpeningLine[] | null>(null);
+
+  useEffect(() => {
+    let live = true;
+    void openingCatalog().then((rows) => {
+      if (live) setLines(rows);
+    });
+    return () => {
+      live = false;
+    };
+  }, []);
+
+  const shown = useMemo(() => {
+    if (!lines) return [];
+    const q = query.trim().toLowerCase();
+    if (!q) return FEATURED.map((name) => lines.find((line) => line.name === name)).filter((line) => line !== undefined);
+    return lines.filter((line) => line.name.toLowerCase().includes(q)).slice(0, 40);
+  }, [lines, query]);
+
+  const expected = train && atEnd ? train.sans[cursor] : null;
 
   return (
-    <div className="flex flex-col gap-3">
-      {active && (
-        <div className="rounded-[var(--radius-lg)] border border-border bg-surface p-4">
-          <p className="font-display text-lg">{active.title}</p>
-          <p className="mt-1 text-xs text-muted">{active.source}</p>
-          {solved ? (
-            <p className="mt-3 text-sm text-brilliant">{active.idea}</p>
-          ) : miss ? (
-            <p className="mt-3 text-sm text-mistake">Not the sacrificial blow. Keep looking, or play the hinted line.</p>
-          ) : (
-            <p className="mt-3 text-sm text-muted">Find the forcing sacrifice. One move starts the combination.</p>
-          )}
+    <div className="flex flex-col gap-4">
+      <div className="rounded-[var(--radius-lg)] border border-border bg-surface p-4">
+        <p className="font-display text-lg">Openings</p>
+        <p className="mt-1 text-sm text-muted">
+          Pick any line in the book. You play one color. The other side answers from the line, and a wrong move is not played.
+        </p>
+        {train && (
+          <p className={cn("mt-3 text-sm", train.done ? "text-brilliant" : miss ? "text-mistake" : "text-muted")}>
+            {train.done
+              ? `${train.name}. That's the line.`
+              : miss && expected
+                ? `Book plays ${expected}.`
+                : `${train.name}. You play ${train.color === "w" ? "White" : "Black"}.`}
+          </p>
+        )}
+        <div className="mt-3 flex gap-2">
+          <Button size="sm" variant={color === "w" ? "default" : "outline"} onClick={() => setColor("w")}>
+            White
+          </Button>
+          <Button size="sm" variant={color === "b" ? "default" : "outline"} onClick={() => setColor("b")}>
+            Black
+          </Button>
         </div>
-      )}
-      <ul className="flex flex-col gap-1.5">
-        {STUDIES.map((st) => (
-          <li key={st.id}>
-            <button
-              type="button"
-              onClick={() => useGame.getState().loadStudy(st.id)}
-              className={cn(
-                "flex w-full flex-col items-start rounded-[var(--radius-md)] border border-border px-3 py-2.5 text-left hover:bg-surface-2",
-                studyId === st.id && "border-brilliant/40 bg-brilliant/10",
-              )}
-            >
-              <span className="text-sm font-medium">{st.title}</span>
-              <span className="text-xs text-muted">{st.source}</span>
-            </button>
-          </li>
-        ))}
-      </ul>
+        <input
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder={lines ? `Search ${lines.length.toLocaleString()} openings` : "Loading openings"}
+          className="mt-3 w-full rounded-[var(--radius-md)] border border-border bg-bg px-3 py-2 text-sm outline-none"
+          aria-label="Search openings"
+        />
+        <ul className="mt-2 flex max-h-64 flex-col gap-1 overflow-auto">
+          {shown.map((line) => (
+            <li key={`${line.eco}:${line.name}:${line.sans.join(" ")}`}>
+              <button
+                type="button"
+                onClick={() => useGame.getState().startOpening(line, color)}
+                className={cn(
+                  "flex w-full flex-col items-start rounded-[var(--radius-md)] border border-border px-3 py-2 text-left hover:bg-surface-2",
+                  train?.name === line.name && "border-brilliant/40 bg-brilliant/10",
+                )}
+              >
+                <span className="text-sm font-medium">{line.name}</span>
+                <span className="text-xs text-muted">
+                  {line.eco} · {line.sans.length} {line.sans.length === 1 ? "move" : "moves"}
+                </span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      </div>
+
+      <div>
+        <p className="mb-2 text-xs font-medium tracking-wide text-subtle uppercase">Patterns</p>
+        {active && (
+          <div className="mb-2 rounded-[var(--radius-lg)] border border-border bg-surface p-4">
+            <p className="font-display text-lg">{active.title}</p>
+            <p className="mt-1 text-xs text-muted">{active.source}</p>
+            {solved && !train ? (
+              <p className="mt-3 text-sm text-brilliant">{active.idea}</p>
+            ) : miss && !train ? (
+              <p className="mt-3 text-sm text-mistake">Not the sacrificial blow. Keep looking, or play the hinted line.</p>
+            ) : !train ? (
+              <p className="mt-3 text-sm text-muted">Find the forcing sacrifice. One move starts the combination.</p>
+            ) : null}
+          </div>
+        )}
+        <ul className="flex flex-col gap-1.5">
+          {STUDIES.map((st) => (
+            <li key={st.id}>
+              <button
+                type="button"
+                onClick={() => useGame.getState().loadStudy(st.id)}
+                className={cn(
+                  "flex w-full flex-col items-start rounded-[var(--radius-md)] border border-border px-3 py-2.5 text-left hover:bg-surface-2",
+                  studyId === st.id && !train && "border-brilliant/40 bg-brilliant/10",
+                )}
+              >
+                <span className="text-sm font-medium">{st.title}</span>
+                <span className="text-xs text-muted">{st.source}</span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      </div>
     </div>
   );
 }

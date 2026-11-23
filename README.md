@@ -14,7 +14,7 @@ Play it at [villiance.vercel.app](https://villiance.vercel.app).
 
 **Review.** Paste moves, or look up a public Chess.com or Lichess account. Villiance walks the game, draws the evaluation, and marks only the moves that actually dropped. A blunder opens the position where it happened and shows the move to play instead. The review also says where you left the book. You can copy an annotated PGN or share the position.
 
-**Studies.** Short forcing positions. The arrow stays hidden until you miss.
+**Studies.** Forcing patterns, plus any opening in the book. You pick a color and play that side. The other side answers from the line. A move that leaves the book is refused, and the book move is shown.
 
 You can step backward and forward through the moves, flip the board, import a PGN or FEN, and copy the game back out.
 

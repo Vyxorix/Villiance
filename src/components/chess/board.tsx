@@ -76,6 +76,7 @@ export function ChessBoard() {
   const mode = useGame((s) => s.mode);
   const studyMiss = useGame((s) => s.studyMiss);
   const studySolved = useGame((s) => s.studySolved);
+  const trainLive = useGame((s) => Boolean(s.train && !s.train.done));
   const showCoords = useGame((s) => s.showCoords);
   const pending = useGame((s) => s.pendingPromotion);
   const dragging = useGame((s) => s.dragging);
@@ -137,7 +138,7 @@ export function ChessBoard() {
     };
   }, [dragging, sqFromPoint]);
 
-  const hints = showSuggestions({ mode, studyMiss, studySolved });
+  const hints = showSuggestions({ mode, studyMiss, studySolved, trainLive });
   const arrowMoves: { from: Square; to: Square; kind: "best" | "brilliant" | "alt" | "threat" }[] = [];
   if (hints && !dragging) {
     const bestUci = brilliant?.uci ?? lines[0]?.pv[0] ?? "";

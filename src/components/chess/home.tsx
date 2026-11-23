@@ -101,7 +101,7 @@ export function HomeScreen() {
             <div>
               <h2 className="font-display text-2xl leading-none">Studies</h2>
               <p className="mt-2 text-sm leading-relaxed text-muted">
-                Short forcing positions. Find the sacrifice yourself — the arrow appears only after a miss.
+                Forcing patterns, or any opening in the book. You play one color. A wrong move is refused, and the book move is shown.
               </p>
             </div>
           </div>

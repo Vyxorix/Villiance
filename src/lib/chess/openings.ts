@@ -103,3 +103,15 @@ export function openingReport(sans: string[]): OpeningReport {
     }).slice(0, 4),
   };
 }
+
+export type OpeningLine = { eco: string; name: string; sans: string[] };
+
+let catalog: OpeningLine[] | null = null;
+
+/** Named lines from the Lichess opening book, in their usual move order. */
+export async function openingCatalog(): Promise<OpeningLine[]> {
+  if (catalog) return catalog;
+  const mod = (await import("./lines.json")) as { default: OpeningLine[] };
+  catalog = mod.default;
+  return catalog;
+}

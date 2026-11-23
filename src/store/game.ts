@@ -6,7 +6,7 @@ import { coachFromLines, planClipboard, refineCoach, type ThreatArrow } from "@/
 import { outcomeFromChess, type Outcome } from "@/lib/chess/play";
 import type { AnalyzeResult } from "@/lib/chess/engine";
 import { kingSquare, statusText, toUci, uciParts } from "@/lib/chess/helpers";
-import { isBookMove, openingName } from "@/lib/chess/openings";
+import { isBookMove, openingName, type OpeningLine } from "@/lib/chess/openings";
 import { loadPersist, savePersist } from "@/lib/chess/persist";
 import { playMoveSound, resumeAudio } from "@/lib/chess/sound";
 import { STUDIES } from "@/lib/chess/studies";
@@ -25,6 +25,15 @@ import type {
 
 export type LineHint = { at: number; uci: string; san: string; pvSan: string[] };
 
+export type Train = {
+  name: string;
+  sans: string[];
+  color: Color;
+  reveal: boolean;
+  done: boolean;
+  token: number;
+};
+
 export type PendingPromotion = { from: Sq; to: Sq };
 
 export type Screen = "home" | "settings" | "board";
@@ -33,9 +42,13 @@ export function showSuggestions(s: {
   mode: GameMode;
   studyMiss: boolean;
   studySolved: boolean;
+  trainLive?: boolean;
 }): boolean {
   if (s.mode === "analyze") return true;
-  if (s.mode === "study") return s.studyMiss || s.studySolved;
+  if (s.mode === "study") {
+    if (s.trainLive) return false;
+    return s.studyMiss || s.studySolved;
+  }
   return false;
 }
 
@@ -85,6 +98,7 @@ type GameState = {
   whiteMs: number;
   blackMs: number;
   outcome: Outcome | null;
+  train: Train | null;
 };
 
 type GameActions = {
@@ -124,6 +138,8 @@ type GameActions = {
   startVs: (color: Color | "random") => void;
   startSuggest: () => void;
   startStudies: () => void;
+  startOpening: (line: OpeningLine, color: Color) => void;
+  replyTrain: (token: number) => void;
   setReviewOpen: (open: boolean) => void;
   setThreat: (fen: string, threat: ThreatArrow | null) => void;
   applyClipboard: (text: string, replace: boolean) => string | null;
@@ -202,6 +218,7 @@ const initial: GameState = {
   whiteMs: 0,
   blackMs: 0,
   outcome: null,
+  train: null,
 };
 
 export const useGame = create<GameState & GameActions>((set, get) => ({
@@ -344,6 +361,7 @@ export const useGame = create<GameState & GameActions>((set, get) => ({
       studyId: null,
       studySolved: false,
       studyMiss: false,
+      train: null,
       hoverDest: null,
       dragging: null,
       startEval: null,
@@ -398,6 +416,7 @@ export const useGame = create<GameState & GameActions>((set, get) => ({
         reportedAccuracy: null,
         advice: null,
         threat: null,
+        train: null,
       });
       get().persistNow();
       return null;
@@ -428,6 +447,7 @@ export const useGame = create<GameState & GameActions>((set, get) => ({
         reportedAccuracy: null,
         advice: null,
         threat: null,
+        train: null,
       });
       get().persistNow();
       return null;
@@ -454,6 +474,7 @@ export const useGame = create<GameState & GameActions>((set, get) => ({
       studyId: id,
       studySolved: false,
       studyMiss: false,
+      train: null,
       engineOn: true,
       startEval: null,
       reviewing: false,
@@ -485,14 +506,50 @@ export const useGame = create<GameState & GameActions>((set, get) => ({
     const piece = chess.get(from);
     if (!piece) return false;
     if (chess.isGameOver() || s.outcome) return false;
+    if (s.train && !s.train.done && s.cursor === s.plies.length && chess.turn() !== s.train.color) return false;
     const legal = chess.moves({ square: from, verbose: true }).find((m) => m.to === to);
     if (!legal) {
       set({ selected: null, dests: [] });
       return false;
     }
     if (legal.promotion && !promotion) {
+      const train = s.train;
+      if (train && !train.done && s.cursor === s.plies.length && chess.turn() === train.color) {
+        const expected = train.sans[s.cursor];
+        const want = chess.moves({ verbose: true }).find((m) => m.san === expected);
+        if (!want || want.from !== from || want.to !== to) {
+          set({
+            studyMiss: true,
+            selected: null,
+            dests: [],
+            train: { ...train, reveal: true },
+            lineHint: want
+              ? { at: s.cursor, uci: toUci(want.from, want.to, want.promotion), san: expected ?? want.san, pvSan: [expected ?? want.san] }
+              : null,
+          });
+          return false;
+        }
+      }
       set({ pendingPromotion: { from, to }, selected: from, dests: [to] });
       return true;
+    }
+    if (s.train && !s.train.done && s.cursor === s.plies.length && chess.turn() === s.train.color) {
+      const expected = s.train.sans[s.cursor];
+      const want = chess.moves({ verbose: true }).find((m) => m.san === expected);
+      const same = want && want.from === from && want.to === to && (!want.promotion || want.promotion === promotion);
+      if (!same) {
+        set({
+          studyMiss: true,
+          selected: null,
+          dests: [],
+          pendingPromotion: null,
+          train: { ...s.train, reveal: true },
+          lineHint: want
+            ? { at: s.cursor, uci: toUci(want.from, want.to, want.promotion), san: expected ?? want.san, pvSan: [expected ?? want.san] }
+            : null,
+        });
+        return false;
+      }
     }
     const beforeFen = chess.fen();
     let moved;
@@ -520,7 +577,11 @@ export const useGame = create<GameState & GameActions>((set, get) => ({
 
     let studySolved = s.studySolved;
     let studyMiss = s.studyMiss;
-    if (s.mode === "study" && s.studyId && s.cursor === 0 && s.plies.length === 0) {
+    if (s.mode === "study" && s.train && !s.train.done && s.cursor === s.plies.length) {
+      studyMiss = false;
+      studySolved = s.cursor + 1 >= s.train.sans.length;
+      ply.classification = "book";
+    } else if (s.mode === "study" && s.studyId && s.cursor === 0 && s.plies.length === 0) {
       const study = STUDIES.find((st) => st.id === s.studyId);
       if (study) {
         if (ply.uci === study.solution || ply.uci.startsWith(study.solution)) {
@@ -555,14 +616,26 @@ export const useGame = create<GameState & GameActions>((set, get) => ({
       dests: [],
       pendingPromotion: null,
       lastMove: { from: moved.from, to: moved.to },
-      opening: openingName(sans),
+      opening: s.train ? s.train.name : openingName(sans),
       studySolved,
       studyMiss,
+      train: s.train
+        ? {
+            ...s.train,
+            reveal: false,
+            done: s.train.done || (s.cursor === s.plies.length && s.cursor + 1 >= s.train.sans.length),
+          }
+        : s.train,
+      lineHint: s.train ? null : s.lineHint,
       dragging: null,
       hoverDest: null,
       outcome: s.mode === "play" ? outcomeFromChess(chess, s.playerColor) : null,
     });
     get().persistNow();
+    if (s.train && !s.train.done && s.cursor + 1 < s.train.sans.length) {
+      const token = s.train.token;
+      setTimeout(() => get().replyTrain(token), 280);
+    }
     return true;
   },
 
@@ -660,6 +733,75 @@ export const useGame = create<GameState & GameActions>((set, get) => ({
     const id = STUDIES[0]?.id;
     if (id) get().loadStudy(id);
     set({ screen: "board", engineOn: true });
+  },
+  startOpening: (line, color) => {
+    const token = (get().train?.token ?? 0) + 1;
+    get().newGame({ color, mode: "study" });
+    set({
+      screen: "board",
+      orientation: color,
+      playerColor: color,
+      mode: "study",
+      studyId: null,
+      opening: line.name,
+      engineOn: true,
+      studySolved: false,
+      studyMiss: false,
+      lineHint: null,
+      train: { name: line.name, sans: line.sans, color, reveal: false, done: false, token },
+    });
+    setTimeout(() => get().replyTrain(token), 280);
+  },
+  replyTrain: (token) => {
+    const s = get();
+    const train = s.train;
+    if (!train || train.done || train.token !== token) return;
+    if (s.mode !== "study" || s.cursor !== s.plies.length) return;
+    const chess = s.chess();
+    if (chess.isGameOver() || chess.turn() === train.color) return;
+    if (s.cursor >= train.sans.length) {
+      set({ train: { ...train, done: true }, studySolved: true, studyMiss: false, lineHint: null });
+      return;
+    }
+    const san = train.sans[s.cursor];
+    let moved;
+    try {
+      moved = chess.move(san);
+    } catch {
+      moved = null;
+    }
+    if (!moved) {
+      set({ train: { ...train, done: true }, studySolved: true });
+      return;
+    }
+    const ply: Ply = {
+      san: moved.san,
+      from: moved.from,
+      to: moved.to,
+      promotion: moved.promotion,
+      uci: toUci(moved.from, moved.to, moved.promotion),
+      fenAfter: chess.fen(),
+      classification: "book",
+    };
+    const done = s.cursor + 1 >= train.sans.length;
+    if (s.sound) {
+      resumeAudio();
+      playMoveSound(chess.inCheck() ? "check" : moved.isCapture() ? "capture" : "move");
+    }
+    set({
+      plies: [...s.plies, ply],
+      cursor: s.cursor + 1,
+      lastMove: { from: moved.from, to: moved.to },
+      opening: train.name,
+      selected: null,
+      dests: [],
+      pendingPromotion: null,
+      studyMiss: false,
+      studySolved: done,
+      lineHint: null,
+      train: { ...train, reveal: false, done },
+    });
+    if (!done && chess.turn() !== train.color) setTimeout(() => get().replyTrain(token), 280);
   },
   setReviewOpen: (reviewOpen) => set({ reviewOpen }),
 
