@@ -15,6 +15,8 @@ import {
   StudiesPanel,
   CoachStrip,
   LineHintBar,
+  ClockBar,
+  ResultCard,
 } from "@/components/chess/panels";
 import { ReviewDialog } from "@/components/chess/review-dialog";
 import { Button } from "@/components/ui/button";
@@ -38,6 +40,38 @@ export function AppShell() {
   useEffect(() => {
     hydrate();
   }, [hydrate]);
+
+  useEffect(() => {
+    if (screen !== "board" || mode !== "play") return;
+    const id = window.setInterval(() => useGame.getState().tickClock(), 200);
+    return () => window.clearInterval(id);
+  }, [screen, mode]);
+
+  useEffect(() => {
+    if (screen !== "board" || mode !== "play") return;
+    let lock: WakeLockSentinel | null = null;
+    let gone = false;
+    const acquire = () => {
+      if (gone || !navigator.wakeLock) return;
+      void navigator.wakeLock
+        .request("screen")
+        .then((next) => {
+          if (gone) void next.release();
+          else lock = next;
+        })
+        .catch(() => undefined);
+    };
+    acquire();
+    const onShow = () => {
+      if (document.visibilityState === "visible") acquire();
+    };
+    document.addEventListener("visibilitychange", onShow);
+    return () => {
+      gone = true;
+      document.removeEventListener("visibilitychange", onShow);
+      void lock?.release();
+    };
+  }, [screen, mode]);
 
   useEffect(() => {
     const hide = () => {
@@ -164,7 +198,9 @@ export function AppShell() {
                   <EvalBar orientation={orientation} horizontal />
                 </div>
                 <CapturedRow />
+                <ClockBar />
                 <ChessBoard />
+                <ResultCard />
                 <LineHintBar />
                 {mode === "analyze" && <CoachStrip />}
                 <ClassificationKey />

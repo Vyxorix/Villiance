@@ -26,6 +26,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Textarea } from "@/components/ui/textarea";
 import { coachSentence } from "@/lib/chess/coach";
 import { capturedPieces, formatScore, pieceSrc, statusText } from "@/lib/chess/helpers";
+import { formatClock, outcomeFromChess } from "@/lib/chess/play";
 import { STUDIES } from "@/lib/chess/studies";
 import { cn } from "@/lib/utils";
 import { showSuggestions, useGame, usePosition } from "@/store/game";
@@ -94,6 +95,11 @@ export function GameToolbar() {
       <Button variant="ghost" size="icon-sm" aria-label="Flip board" onClick={() => useGame.getState().flip()}>
         <FlipVertical2 className="size-4" />
       </Button>
+      {mode === "play" && (
+        <Button variant="ghost" size="sm" onClick={() => useGame.getState().resign()}>
+          Resign
+        </Button>
+      )}
       <Button
         variant="ghost"
         size="icon-sm"
@@ -215,6 +221,60 @@ function MoveBtn({
         </span>
       )}
     </button>
+  );
+}
+
+export function ClockBar() {
+  const mode = useGame((s) => s.mode);
+  const clockMs = useGame((s) => s.clockMs);
+  const whiteMs = useGame((s) => s.whiteMs);
+  const blackMs = useGame((s) => s.blackMs);
+  const orientation = useGame((s) => s.orientation);
+  const cursor = useGame((s) => s.cursor);
+  const len = useGame((s) => s.plies.length);
+  const chess = usePosition();
+  if (mode !== "play" || clockMs <= 0) return null;
+  const top = orientation === "w" ? blackMs : whiteMs;
+  const bottom = orientation === "w" ? whiteMs : blackMs;
+  const live = cursor === len && !chess.isGameOver();
+  const topOn = live && chess.turn() !== orientation;
+  const bottomOn = live && chess.turn() === orientation;
+  const face = (ms: number, on: boolean) =>
+    cn(
+      "rounded-[var(--radius-sm)] px-2 py-1 font-mono text-sm tabular-nums",
+      on ? "bg-accent text-accent-fg" : "bg-surface-2 text-muted",
+      ms < 20_000 && "text-blunder",
+    );
+  return (
+    <div className="flex items-center justify-between">
+      <span className={face(top, topOn)}>{formatClock(top)}</span>
+      <span className={face(bottom, bottomOn)}>{formatClock(bottom)}</span>
+    </div>
+  );
+}
+
+export function ResultCard() {
+  const mode = useGame((s) => s.mode);
+  const outcome = useGame((s) => s.outcome);
+  const cursor = useGame((s) => s.cursor);
+  const len = useGame((s) => s.plies.length);
+  const playerColor = useGame((s) => s.playerColor);
+  const chess = usePosition();
+  if (mode !== "play" || cursor !== len) return null;
+  const shown = outcome ?? outcomeFromChess(chess, playerColor);
+  if (!shown) return null;
+  return (
+    <div className="rounded-[var(--radius-lg)] border border-border bg-surface px-4 py-4">
+      <p className="font-display text-2xl leading-none">{shown.reason}</p>
+      <div className="mt-3 flex gap-2">
+        <Button size="sm" onClick={() => useGame.getState().startVs(playerColor)}>
+          Rematch
+        </Button>
+        <Button size="sm" variant="outline" onClick={() => useGame.getState().setScreen("home")}>
+          Menu
+        </Button>
+      </div>
+    </div>
   );
 }
 

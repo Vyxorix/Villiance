@@ -1,10 +1,13 @@
 import type { EngineLine, Score } from "./types";
 import { pvToSan } from "./helpers";
+import { skillForStrength } from "./play";
 
 export type AnalyzeOptions = {
   movetime?: number;
   depth?: number;
   multipv?: number;
+  /** Limit strength to this Elo. Omit or 0 for full strength. */
+  elo?: number | null;
 };
 
 export type AnalyzeResult = {
@@ -127,7 +130,16 @@ export class StockfishEngine {
       this.post("stop");
     }
     const multipv = opts.multipv ?? 4;
+    const elo = opts.elo && opts.elo > 0 ? Math.round(opts.elo) : 0;
     this.post(`setoption name MultiPV value ${multipv}`);
+    if (elo) {
+      this.post("setoption name UCI_LimitStrength value true");
+      this.post(`setoption name UCI_Elo value ${Math.max(1320, Math.min(3190, elo))}`);
+      this.post(`setoption name Skill Level value ${skillForStrength(elo)}`);
+    } else {
+      this.post("setoption name UCI_LimitStrength value false");
+      this.post("setoption name Skill Level value 20");
+    }
     this.post("ucinewgame");
     this.post(`position fen ${fen}`);
     const go = opts.depth

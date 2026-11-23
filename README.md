@@ -8,11 +8,11 @@ Play it at [villiance.vercel.app](https://villiance.vercel.app).
 
 ## Play
 
-**Vs engine.** You move. Villiance answers. Suggestion arrows stay off.
+**Vs engine.** You move. Villiance answers, from the opening book while the position is still theory. Suggestion arrows stay off. Strength is a rating, separate from how long it thinks. Add a clock, resign, or play on until the result.
 
 **Suggest only.** You are playing someone somewhere else and copying the moves here. Villiance recommends a reply and never moves a piece for you. After each move it says what the engine wanted and what it cost. Two quieter arrows are the next choices, and an orange arrow is the threat if you do nothing. Paste a move, a game, or a position, or copy one and come back to the app.
 
-**Review.** Paste moves, or look up a public Chess.com username. Villiance walks the game, draws the evaluation, and marks only the moves that actually dropped.
+**Review.** Paste moves, or look up a public Chess.com or Lichess account. Villiance walks the game, draws the evaluation, and marks only the moves that actually dropped. A blunder opens the position where it happened and shows the move to play instead. The review also says where you left the book. You can copy an annotated PGN or share the position.
 
 **Studies.** Short forcing positions. The arrow stays hidden until you miss.
 

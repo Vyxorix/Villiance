@@ -3,6 +3,7 @@ import { Chess, DEFAULT_POSITION, type Square } from "chess.js";
 import { create } from "zustand";
 import { classifyFromLines, labelFromEvals, pickBrilliant } from "@/lib/chess/classify";
 import { coachFromLines, planClipboard, refineCoach, type ThreatArrow } from "@/lib/chess/coach";
+import { outcomeFromChess, type Outcome } from "@/lib/chess/play";
 import type { AnalyzeResult } from "@/lib/chess/engine";
 import { kingSquare, statusText, toUci, uciParts } from "@/lib/chess/helpers";
 import { isBookMove, openingName } from "@/lib/chess/openings";
@@ -79,6 +80,11 @@ type GameState = {
   advice: { fen: string; lines: EngineLine[] } | null;
   threat: ThreatArrow | null;
   lineHint: LineHint | null;
+  strength: number;
+  clockMs: number;
+  whiteMs: number;
+  blackMs: number;
+  outcome: Outcome | null;
 };
 
 type GameActions = {
@@ -122,6 +128,11 @@ type GameActions = {
   setThreat: (fen: string, threat: ThreatArrow | null) => void;
   applyClipboard: (text: string, replace: boolean) => string | null;
   revealLine: (plyIndex: number) => void;
+  playSan: (san: string) => boolean;
+  resign: () => void;
+  tickClock: () => void;
+  setStrength: (elo: number) => void;
+  setClockMs: (ms: number) => void;
   canMove: (color: Color) => boolean;
   pgn: () => string;
 };
@@ -186,6 +197,11 @@ const initial: GameState = {
   advice: null,
   threat: null,
   lineHint: null,
+  strength: 0,
+  clockMs: 0,
+  whiteMs: 0,
+  blackMs: 0,
+  outcome: null,
 };
 
 export const useGame = create<GameState & GameActions>((set, get) => ({
@@ -202,6 +218,10 @@ export const useGame = create<GameState & GameActions>((set, get) => ({
         boardTheme: saved.boardTheme,
         room: saved.room,
         customBg: saved.customBg,
+        strength: saved.strength,
+        clockMs: saved.clockMs,
+        whiteMs: saved.clockMs,
+        blackMs: saved.clockMs,
       });
       return;
     }
@@ -249,6 +269,11 @@ export const useGame = create<GameState & GameActions>((set, get) => ({
         screen: saved.screen === "board" ? "board" : "home",
         advice: null,
         threat: null,
+        strength: saved.strength,
+        clockMs: saved.clockMs,
+        whiteMs: saved.clockMs,
+        blackMs: saved.clockMs,
+        outcome: null,
       });
     } catch {
       set({ movetime: saved.movetime, sound: saved.sound, showCoords: saved.showCoords, boardTheme: saved.boardTheme, room: saved.room, customBg: saved.customBg });
@@ -274,6 +299,8 @@ export const useGame = create<GameState & GameActions>((set, get) => ({
       customBg: s.customBg,
       screen: s.screen === "board" || (s.screen === "settings" && s.settingsBack === "board") ? "board" : "home",
       coaches: s.plies.flatMap((ply, i) => (ply.coach ? [{ i, uci: ply.uci, note: ply.coach }] : [])),
+      strength: s.strength,
+      clockMs: s.clockMs,
     });
   },
 
@@ -289,7 +316,7 @@ export const useGame = create<GameState & GameActions>((set, get) => ({
   canMove: (color) => {
     const s = get();
     const chess = s.chess();
-    if (chess.isGameOver()) return false;
+    if (chess.isGameOver() || s.outcome) return false;
     if (chess.turn() !== color) return false;
     if (s.mode === "analyze" || s.mode === "study") return true;
     return color === s.playerColor;
@@ -326,6 +353,10 @@ export const useGame = create<GameState & GameActions>((set, get) => ({
       reportedAccuracy: null,
       advice: null,
       threat: null,
+      lineHint: null,
+      whiteMs: get().clockMs,
+      blackMs: get().clockMs,
+      outcome: null,
     });
     get().persistNow();
   },
@@ -453,8 +484,7 @@ export const useGame = create<GameState & GameActions>((set, get) => ({
     const chess = s.chess();
     const piece = chess.get(from);
     if (!piece) return false;
-    if (chess.isGameOver()) return false;
-    if (chess.turn() !== piece.color) return false;
+    if (chess.isGameOver() || s.outcome) return false;
     const legal = chess.moves({ square: from, verbose: true }).find((m) => m.to === to);
     if (!legal) {
       set({ selected: null, dests: [] });
@@ -530,6 +560,7 @@ export const useGame = create<GameState & GameActions>((set, get) => ({
       studyMiss,
       dragging: null,
       hoverDest: null,
+      outcome: s.mode === "play" ? outcomeFromChess(chess, s.playerColor) : null,
     });
     get().persistNow();
     return true;
@@ -732,6 +763,62 @@ export const useGame = create<GameState & GameActions>((set, get) => ({
       reviewOpen: false,
       lineHint: better ? { at: plyIndex, uci: better.uci, san: better.san, pvSan: better.pvSan } : null,
     });
+  },
+
+  playSan: (san) => {
+    const s = get();
+    if (s.mode !== "play" || s.outcome || s.cursor !== s.plies.length) return false;
+    const chess = s.chess();
+    if (chess.isGameOver() || chess.turn() === s.playerColor) return false;
+    let moved;
+    try {
+      moved = chess.move(san);
+    } catch {
+      return false;
+    }
+    if (!moved) return false;
+    return get().tryMove(moved.from, moved.to, moved.promotion);
+  },
+
+  resign: () => {
+    const s = get();
+    if (s.mode !== "play" || s.outcome || s.chess().isGameOver()) return;
+    const winner = s.playerColor === "w" ? "b" : "w";
+    set({ outcome: { winner, reason: "You resigned" } });
+  },
+
+  tickClock: () => {
+    const s = get();
+    if (s.mode !== "play" || s.screen !== "board" || s.clockMs <= 0 || s.outcome) return;
+    if (s.cursor !== s.plies.length) return;
+    const chess = s.chess();
+    if (chess.isGameOver()) return;
+    const turn = chess.turn();
+    const left = (turn === "w" ? s.whiteMs : s.blackMs) - 200;
+    if (left <= 0) {
+      const winner = turn === "w" ? "b" : "w";
+      set({
+        whiteMs: turn === "w" ? 0 : s.whiteMs,
+        blackMs: turn === "b" ? 0 : s.blackMs,
+        outcome: {
+          winner,
+          reason: winner === s.playerColor ? "You won on time" : "You lost on time",
+        },
+      });
+      return;
+    }
+    set(turn === "w" ? { whiteMs: left } : { blackMs: left });
+  },
+
+  setStrength: (strength) => {
+    set({ strength });
+    get().persistNow();
+  },
+
+  setClockMs: (clockMs) => {
+    const fresh = get().plies.length === 0;
+    set(fresh ? { clockMs, whiteMs: clockMs, blackMs: clockMs } : { clockMs });
+    get().persistNow();
   },
 }));
 

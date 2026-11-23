@@ -2,6 +2,7 @@ import { useEffect, useRef } from "react";
 import { nullMoveFen, passerLossCp, threatMatters, threatMoveInfo } from "@/lib/chess/coach";
 import { needsDeeperCheck } from "@/lib/chess/classify";
 import { getEngine } from "@/lib/chess/engine";
+import { pickBookReply } from "@/lib/chess/openings";
 import { useGame } from "@/store/game";
 
 export function useEngineBridge() {
@@ -13,6 +14,7 @@ export function useEngineBridge() {
   const mode = useGame((s) => s.mode);
   const screen = useGame((s) => s.screen);
   const reviewing = useGame((s) => s.reviewing);
+  const strength = useGame((s) => s.strength);
   const playerColor = useGame((s) => s.playerColor);
   const plyCount = useGame((s) => s.plies.length);
   const fen = plyFen ?? startFen;
@@ -44,14 +46,42 @@ export function useEngineBridge() {
         await engine.start();
         if (id !== gen.current) return;
         useGame.getState().setEngineReady(true);
-        const result = await engine.analyze(fen, { movetime, multipv: 4 });
+        const live = useGame.getState();
+        const bookSan =
+          live.mode === "play" && live.cursor === live.plies.length && !live.outcome
+            ? pickBookReply(
+                live.plies.slice(0, live.cursor).map((ply) => ply.san),
+                null,
+              )
+            : null;
+        const engineTurn =
+          live.mode === "play" &&
+          live.cursor === live.plies.length &&
+          !live.outcome &&
+          !live.chess().isGameOver() &&
+          live.chess().turn() !== live.playerColor;
+        if (bookSan && engineTurn) {
+          playTimer = window.setTimeout(() => {
+            if (id !== gen.current) return;
+            useGame.getState().playSan(bookSan);
+          }, 360);
+        }
+        const left = live.clockMs > 0 ? (live.turn() === "w" ? live.whiteMs : live.blackMs) : movetime;
+        const think = live.mode === "play" && live.clockMs > 0 ? Math.min(movetime, Math.max(80, left - 150)) : movetime;
+        const result = await engine.analyze(fen, {
+          movetime: think,
+          multipv: 4,
+          elo: live.mode === "play" ? strength : 0,
+        });
         if (id !== gen.current) return;
         useGame.getState().applyAnalysis(result, fen);
         const s = useGame.getState();
         const chess = s.chess();
         const shouldReply =
+          !bookSan &&
           s.mode === "play" &&
           s.cursor === s.plies.length &&
+          !s.outcome &&
           !chess.isGameOver() &&
           chess.turn() !== s.playerColor &&
           Boolean(s.brilliant);
@@ -102,5 +132,5 @@ export function useEngineBridge() {
       if (useGame.getState().reviewing) return;
       engine.stop();
     };
-  }, [fen, engineOn, movetime, mode, playerColor, plyCount, cursor, screen, reviewing]);
+  }, [fen, engineOn, movetime, mode, playerColor, plyCount, cursor, screen, reviewing, strength]);
 }

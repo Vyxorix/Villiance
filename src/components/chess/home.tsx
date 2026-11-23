@@ -1,5 +1,6 @@
 import { Compass, Library, Settings2, Swords } from "lucide-react";
 import { BOARD_THEMES, ROOMS, inkOf, thinkLabel } from "@/lib/chess/appearance";
+import { CLOCKS, STRENGTHS } from "@/lib/chess/play";
 import { ReviewHome } from "@/components/chess/review-home";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
@@ -129,6 +130,8 @@ function SettingsScreen() {
   const customBg = useGame((s) => s.customBg);
   const sound = useGame((s) => s.sound);
   const showCoords = useGame((s) => s.showCoords);
+  const strength = useGame((s) => s.strength);
+  const clockMs = useGame((s) => s.clockMs);
   const back = useGame((s) => s.settingsBack);
 
   return (
@@ -156,6 +159,42 @@ function SettingsScreen() {
           onValueChange={(v) => useGame.getState().setMovetime(v[0] ?? 480)}
           aria-label="Think time"
         />
+      </section>
+
+      <section className="rounded-[var(--radius-lg)] border border-border bg-surface p-4 sm:p-5">
+        <h2 className="font-display text-xl leading-none">Strength</h2>
+        <p className="mt-2 mb-3 text-sm text-muted">
+          Separate from think time. Full is the real engine. A rating is a weaker one, even on a short search.
+        </p>
+        <div className="flex flex-wrap gap-2">
+          {STRENGTHS.map((item) => (
+            <Button
+              key={item.elo}
+              size="sm"
+              variant={strength === item.elo ? "default" : "outline"}
+              onClick={() => useGame.getState().setStrength(item.elo)}
+            >
+              {item.label}
+            </Button>
+          ))}
+        </div>
+      </section>
+
+      <section className="rounded-[var(--radius-lg)] border border-border bg-surface p-4 sm:p-5">
+        <h2 className="font-display text-xl leading-none">Clock</h2>
+        <p className="mt-2 mb-3 text-sm text-muted">Used the next time you start Vs engine. Off keeps the game untimed.</p>
+        <div className="flex flex-wrap gap-2">
+          {CLOCKS.map((item) => (
+            <Button
+              key={item.ms}
+              size="sm"
+              variant={clockMs === item.ms ? "default" : "outline"}
+              onClick={() => useGame.getState().setClockMs(item.ms)}
+            >
+              {item.label}
+            </Button>
+          ))}
+        </div>
       </section>
 
       <section>
