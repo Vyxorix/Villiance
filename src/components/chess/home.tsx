@@ -119,6 +119,13 @@ export function HomeScreen() {
           Import PGN or FEN
         </Button>
       </div>
+
+      <p className="text-xs text-subtle">
+        Support{" "}
+        <a className="underline decoration-border underline-offset-2" href="mailto:vyxorix@gmail.com">
+          vyxorix@gmail.com
+        </a>
+      </p>
     </div>
   );
 }
@@ -270,6 +277,19 @@ function SettingsScreen() {
           on={showCoords}
           onClick={() => useGame.getState().setShowCoords(!showCoords)}
         />
+      </section>
+
+      <section className="rounded-[var(--radius-lg)] border border-border bg-surface p-4 sm:p-5">
+        <h2 className="font-display text-xl leading-none">Support</h2>
+        <p className="mt-2 text-sm leading-relaxed text-muted">
+          A bug, a position, or an idea. Your games stay on this device.
+        </p>
+        <a
+          className="mt-3 inline-block text-sm underline decoration-border underline-offset-4"
+          href="mailto:vyxorix@gmail.com"
+        >
+          vyxorix@gmail.com
+        </a>
       </section>
     </div>
   );

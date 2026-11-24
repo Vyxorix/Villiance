@@ -35,13 +35,15 @@ Accuracy on the review is the Lichess formula: each move is scored from the win 
 
 Think time runs from a snap search to a serious one. Board colors are Sage, Walnut, Ocean, Meadow, Midnight, and Sand. The room behind the board can be Ink, Paper, Dusk, Grove, or a color you pick. Sound and coordinates can be turned off.
 
+Support is [vyxorix@gmail.com](mailto:vyxorix@gmail.com). Games stay on the device.
+
 <img src="docs/screenshots/settings.png" alt="Settings for think time, board themes, and background" width="100%" />
 
 ## Android
 
-Version 1 is a small app that opens the site. It needs a network connection. Site updates show up without a new install.
+Version 1.1 is a small app that opens the site. New board features show up without a new install. The screen stays on while the app is open, and the phone back button leaves a game for the menu. It needs a network connection.
 
-[Download Villiance.apk](https://github.com/Vyxorix/Villiance/releases/tag/v1) from the `v1` release. Android 7 or newer. Allow installs from the browser if the phone asks. It is signed for sideloading, not listed on the Play Store.
+[Download Villiance.apk](https://github.com/Vyxorix/Villiance/releases/tag/v1.1) from the `v1.1` release. Android 7 or newer. Allow installs from the browser if the phone asks. It is signed for sideloading, not listed on the Play Store. The Android project is in `android/`.
 
 ## Run it yourself
 

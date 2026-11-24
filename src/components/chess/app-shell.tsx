@@ -42,6 +42,26 @@ export function AppShell() {
   }, [hydrate]);
 
   useEffect(() => {
+    const onPop = () => {
+      const s = useGame.getState();
+      if (s.screen === "settings") s.setScreen(s.settingsBack);
+      else if (s.screen === "board") s.setScreen("home");
+    };
+    window.addEventListener("popstate", onPop);
+    return () => window.removeEventListener("popstate", onPop);
+  }, []);
+
+  useEffect(() => {
+    const state = window.history.state as { villiance?: string } | null;
+    if (screen === "home") {
+      if (!state?.villiance || state.villiance !== "home") window.history.replaceState({ villiance: "home" }, "");
+      return;
+    }
+    if (state?.villiance === screen) return;
+    window.history.pushState({ villiance: screen }, "");
+  }, [screen]);
+
+  useEffect(() => {
     if (screen !== "board" || mode !== "play") return;
     const id = window.setInterval(() => useGame.getState().tickClock(), 200);
     return () => window.clearInterval(id);
