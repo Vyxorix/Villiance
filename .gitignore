@@ -12,15 +12,26 @@ attachments/
 screenshots/
 
 # Builder runtime, not part of the app.
-.grok/preview.log
-.grok/preview.pid
-.grok/status
-.grok/*.jpg
-.grok/banner*.jpg
-.grok/og-*.jpg
+.grok/
+AGENTS.md
 
 # Android build output. The project itself stays.
 android/.gradle/
 android/local.properties
 android/**/build/
 android/.idea/
+
+# Databases, credentials, backups, and logs.
+*.db
+*.sqlite
+*.sqlite3
+*.pem
+*.key
+*.p12
+*.pfx
+*.bak
+*.backup
+*.log
+logs/
+credentials.json
+credentials*.json

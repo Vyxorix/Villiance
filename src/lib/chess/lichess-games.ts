@@ -1,5 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import type { ChessComGame } from "./chesscom";
+import { allowLookup, fetchPublic, httpsUrl } from "./public-http";
 
 export type LichessLookup =
   | { ok: true; username: string; games: ChessComGame[] }
@@ -43,9 +44,9 @@ function slim(game: LichessGame): ChessComGame | null {
     result: resultOf(game),
     timeClass: game.speed || "game",
     endTime: game.lastMoveAt || game.createdAt || 0,
-    url: `https://lichess.org/${game.id}`,
+    url: game.id && /^[a-zA-Z0-9]{8,12}$/.test(game.id) ? `https://lichess.org/${game.id}` : "",
     accuracy: null,
-    pgn: game.pgn,
+    pgn: game.pgn.length > 200_000 ? game.pgn.slice(0, 200_000) : game.pgn,
   };
 }
 
@@ -57,20 +58,29 @@ export const loadLichessGames = createServerFn({ method: "POST" })
   })
   .handler(async ({ data }): Promise<LichessLookup> => {
     const username = data.username;
+    if (!allowLookup("all", 40) || !allowLookup(`lichess:${username.toLowerCase()}`)) {
+      return { ok: false, error: "Too many lookups. Wait a moment." };
+    }
+    const url = httpsUrl(
+      `https://lichess.org/api/games/user/${encodeURIComponent(username)}?max=12&pgnInJson=true&clocks=false&evals=false&opening=true`,
+      "lichess.org",
+    );
+    if (!url || !url.pathname.startsWith("/api/games/user/")) {
+      return { ok: false, error: "Enter a Lichess username." };
+    }
     try {
-      const url = `https://lichess.org/api/games/user/${encodeURIComponent(username)}?max=12&pgnInJson=true&clocks=false&evals=false&opening=true`;
-      const res = await fetch(url, {
-        headers: {
-          Accept: "application/x-ndjson",
-          "User-Agent": "Villiance/1.0 (public game review)",
-        },
-        signal: AbortSignal.timeout(12000),
-      });
+      const res = await fetchPublic(
+        url.toString(),
+        "lichess.org",
+        { Accept: "application/x-ndjson", "User-Agent": "Villiance/1.0 (public game review)" },
+        600_000,
+      );
+      if (!res) return { ok: false, error: "Lichess did not answer." };
       if (res.status === 404) return { ok: false, error: "No Lichess player with that username." };
-      if (!res.ok) return { ok: false, error: "Lichess did not answer." };
-      const text = await res.text();
-      const games = text
+      if (res.status !== 200) return { ok: false, error: "Lichess did not answer." };
+      const games = res.body
         .split("\n")
+        .slice(0, 12)
         .map((line) => line.trim())
         .filter(Boolean)
         .flatMap((line) => {

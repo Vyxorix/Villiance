@@ -416,11 +416,26 @@ test("keeps the extensions script on commercial when the deployer enables it", (
 });
 
 test("does not duplicate the extensions script", () => {
-  const ctx = { appName: "Demo", projectId: "proj-123" };
-  const once = injectGrokPwaHead("<html><head></head></html>", ctx);
-  const twice = injectGrokPwaHead(once, ctx);
-  assert.equal(once, twice);
-  assert.equal(twice.split("extensions.js").length - 1, 1);
+  const previous = process.env.VITE_GROK_EXTENSIONS;
+  delete process.env.VITE_GROK_EXTENSIONS;
+  try {
+    const off = injectGrokPwaHead("<html><head></head></html>", { appName: "Demo", projectId: "proj-123" });
+    assert.equal(off.includes("extensions.js"), false);
+  } finally {
+    if (previous === undefined) delete process.env.VITE_GROK_EXTENSIONS;
+    else process.env.VITE_GROK_EXTENSIONS = previous;
+  }
+  process.env.VITE_GROK_EXTENSIONS = "1";
+  try {
+    const ctx = { appName: "Demo", projectId: "proj-123" };
+    const once = injectGrokPwaHead("<html><head></head></html>", ctx);
+    const twice = injectGrokPwaHead(once, ctx);
+    assert.equal(once, twice);
+    assert.equal(twice.split("extensions.js").length - 1, 1);
+  } finally {
+    if (previous === undefined) delete process.env.VITE_GROK_EXTENSIONS;
+    else process.env.VITE_GROK_EXTENSIONS = previous;
+  }
 });
 
 test("is idempotent", () => {
