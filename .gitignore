@@ -20,6 +20,7 @@ android/.gradle/
 android/local.properties
 android/**/build/
 android/.idea/
+android/app/src/main/assets/www/
 
 # Databases, credentials, backups, and logs.
 *.db

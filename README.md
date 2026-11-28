@@ -41,9 +41,9 @@ Support is [vyxorix@gmail.com](mailto:vyxorix@gmail.com). Games stay on the devi
 
 ## Android
 
-Version 1.1 is a small app that opens the site. New board features show up without a new install. The screen stays on while the app is open, and the phone back button leaves a game for the menu. It needs a network connection.
+Version 1.2 keeps the board, engine, studies, and pasted-game review inside the app, so those work with no connection. Looking up a Chess.com or Lichess account still needs one. A new install is required when the board itself changes. The screen stays on while the app is open, and the phone back button leaves a game for the menu.
 
-[Download Villiance.apk](https://github.com/Vyxorix/Villiance/releases/tag/v1.1) from the `v1.1` release. Android 7 or newer. Allow installs from the browser if the phone asks. It is signed for sideloading, not listed on the Play Store. The Android project is in `android/`.
+[Download Villiance.apk](https://github.com/Vyxorix/Villiance/releases/tag/v1.2) from the `v1.2` release. Android 7 or newer. Allow installs from the browser if the phone asks. It is signed for sideloading, not listed on the Play Store. The Android project is in `android/`.
 
 ## Run it yourself
 

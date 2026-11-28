@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<network-security-config>
+    <!-- The board is served from 127.0.0.1 inside the app. IP literals cannot
+         be named in a domain-config, so loopback cleartext is allowed here.
+         Everything else stays on HTTPS and is opened in the browser. -->
+    <base-config cleartextTrafficPermitted="true">
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>
+</network-security-config>
